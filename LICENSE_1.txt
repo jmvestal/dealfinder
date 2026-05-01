@@ -1,0 +1,12 @@
+Copyright (c) 2026 DealFinder. All rights reserved.
+
+This software and its source code are proprietary and confidential.
+Unauthorized copying, modification, distribution, sublicensing, or use
+of this software, in whole or in part, is strictly prohibited without
+the express written permission of the owner.
+
+This software is provided "as is", without warranty of any kind, express
+or implied. In no event shall the owner be liable for any claim, damages,
+or other liability arising from the use of this software.
+
+For licensing inquiries, contact: [297capital@gmail.com]

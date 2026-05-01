@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DealFinder — Real Estate Investment Analyzer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg: #f7f6f3;
+    --surface: #ffffff;
+    --surface2: #f0efe9;
+    --border: rgba(0,0,0,0.09);
+    --border-md: rgba(0,0,0,0.15);
+    --text: #1a1917;
+    --text-2: #6b6860;
+    --text-3: #9e9c96;
+    --green: #1a7a4a;
+    --green-bg: #eaf5ee;
+    --red: #b93030;
+    --red-bg: #fceaea;
+    --blue: #185FA5;
+    --blue-bg: #e6f1fb;
+    --amber: #8a5200;
+    --amber-bg: #fef3e0;
+    --accent: #185FA5;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* TOPBAR */
+  .topbar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    height: 52px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .logo { font-size: 17px; font-weight: 600; color: var(--text); white-space: nowrap; letter-spacing: -0.02em; }
+  .logo span { color: var(--accent); }
+  .logo-sub { font-size: 11px; color: var(--text-3); font-family: 'DM Mono', monospace; margin-left: 4px; }
+  .search-bar {
+    flex: 1; display: flex; gap: 8px; max-width: 560px;
+  }
+  .search-bar input {
+    flex: 1; padding: 7px 12px; border: 1px solid var(--border-md);
+    border-radius: var(--radius-sm); font-size: 13px; font-family: 'DM Sans', sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+  .search-bar input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+  .topbar select {
+    padding: 7px 10px; border: 1px solid var(--border-md); border-radius: var(--radius-sm);
+    font-size: 12px; font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text-2);
+    cursor: pointer;
+  }
+  .nav-pills { display: flex; gap: 4px; margin-left: auto; }
+  .nav-pill {
+    padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500;
+    border: 1px solid var(--border-md); background: transparent; color: var(--text-2);
+    cursor: pointer; transition: all .15s;
+  }
+  .nav-pill:hover { background: var(--surface2); }
+  .nav-pill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* LAYOUT */
+  .layout { display: flex; height: calc(100vh - 52px); }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 320px; min-width: 320px; background: var(--surface);
+    border-right: 1px solid var(--border); display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .filter-bar {
+    padding: 10px 12px; border-bottom: 1px solid var(--border);
+    display: flex; gap: 5px; flex-wrap: wrap; align-items: center;
+  }
+  .filter-lbl { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: .06em; margin-right: 2px; }
+  .fpill {
+    font-size: 11px; padding: 3px 9px; border-radius: 20px;
+    border: 1px solid var(--border-md); color: var(--text-2);
+    cursor: pointer; background: transparent; font-family: 'DM Sans', sans-serif; transition: all .12s;
+  }
+  .fpill.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .listings-list { overflow-y: auto; flex: 1; }
+  .results-count { padding: 8px 12px; font-size: 11px; color: var(--text-3); border-bottom: 1px solid var(--border); }
+
+  /* PROPERTY CARD */
+  .prop-card {
+    padding: 12px; border-bottom: 1px solid var(--border);
+    cursor: pointer; transition: background .1s; position: relative;
+  }
+  .prop-card:hover { background: var(--bg); }
+  .prop-card.active { background: #eef4fc; border-left: 3px solid var(--accent); }
+  .prop-thumb {
+    width: 100%; height: 88px; border-radius: var(--radius-sm);
+    margin-bottom: 8px; display: flex; align-items: center; justify-content: center;
+    font-size: 11px; color: var(--text-3); font-family: 'DM Mono', monospace; overflow: hidden;
+    position: relative;
+  }
+  .prop-thumb-grid {
+    position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr; gap: 2px; padding: 2px;
+  }
+  .thumb-cell { border-radius: 3px; }
+  .badge-type {
+    position: absolute; top: 6px; left: 6px; font-size: 10px; font-weight: 600;
+    padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.55); color: #fff;
+    font-family: 'DM Mono', monospace; letter-spacing: .04em;
+  }
+  .prop-addr { font-size: 13px; font-weight: 500; margin-bottom: 1px; }
+  .prop-city { font-size: 11px; color: var(--text-3); margin-bottom: 6px; }
+  .prop-footer { display: flex; justify-content: space-between; align-items: center; }
+  .prop-price { font-size: 15px; font-weight: 600; letter-spacing: -0.02em; }
+  .deal-grade {
+    font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 20px;
+    font-family: 'DM Mono', monospace;
+  }
+  .grade-A { background: var(--green-bg); color: var(--green); }
+  .grade-B { background: var(--blue-bg); color: var(--blue); }
+  .grade-C { background: var(--amber-bg); color: var(--amber); }
+  .grade-D { background: var(--red-bg); color: var(--red); }
+  .prop-meta { display: flex; gap: 8px; margin-top: 5px; flex-wrap: wrap; }
+  .prop-meta span { font-size: 11px; color: var(--text-3); }
+
+  /* DETAIL PANEL */
+  .detail { flex: 1; overflow-y: auto; background: var(--bg); }
+  .empty-detail {
+    height: 100%; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; color: var(--text-3);
+    gap: 8px;
+  }
+  .empty-icon { width: 48px; height: 48px; border: 2px dashed var(--border-md); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+
+  .detail-hero {
+    height: 180px; position: relative; display: flex;
+    align-items: flex-end; padding: 14px;
+    background: var(--surface2);
+  }
+  .hero-grid { position: absolute; inset: 0; display: grid; grid-template-columns: 2fr 1fr; grid-template-rows: 1fr 1fr; gap: 3px; }
+  .hero-cell { }
+  .hero-overlay { position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.4) 0%, transparent 60%); }
+  .hero-info { position: relative; z-index: 1; }
+  .hero-addr { font-size: 18px; font-weight: 600; color: #fff; letter-spacing: -0.02em; margin-bottom: 2px; }
+  .hero-city { font-size: 12px; color: rgba(255,255,255,0.8); }
+
+  .detail-content { padding: 16px; max-width: 860px; }
+
+  /* SCORE BANNER */
+  .score-banner {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px; margin-bottom: 14px;
+  }
+  .score-circle {
+    width: 52px; height: 52px; border-radius: 50%; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; border: 2.5px solid var(--green); flex-shrink: 0;
+  }
+  .score-num { font-size: 18px; font-weight: 600; font-family: 'DM Mono', monospace; }
+  .score-lbl { font-size: 8px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); }
+  .score-info { flex: 1; }
+  .score-title { font-size: 14px; font-weight: 500; margin-bottom: 3px; }
+  .score-desc { font-size: 12px; color: var(--text-2); line-height: 1.5; }
+  .price-big { font-size: 26px; font-weight: 600; letter-spacing: -0.03em; margin-left: auto; }
+
+  /* METRICS */
+  .section-label {
+    font-size: 10px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: .08em; color: var(--text-3); margin: 14px 0 8px;
+  }
+  .metrics-row { display: grid; gap: 8px; margin-bottom: 14px; }
+  .metrics-4 { grid-template-columns: repeat(4, 1fr); }
+  .metrics-3 { grid-template-columns: repeat(3, 1fr); }
+  .metrics-2 { grid-template-columns: repeat(2, 1fr); }
+  .metric {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 10px 12px;
+  }
+  .metric-lbl { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 4px; }
+  .metric-val { font-size: 16px; font-weight: 600; font-family: 'DM Mono', monospace; }
+  .val-pos { color: var(--green); }
+  .val-neg { color: var(--red); }
+  .val-neu { color: var(--blue); }
+
+  /* CALC CARD */
+  .calc-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px; margin-bottom: 12px;
+  }
+  .calc-card-title { font-size: 13px; font-weight: 600; margin-bottom: 12px; color: var(--text); }
+  .form-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .form-grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .form-field { display: flex; flex-direction: column; gap: 3px; }
+  .form-field label { font-size: 10px; color: var(--text-3); text-transform: uppercase; letter-spacing: .05em; }
+  .form-field input {
+    padding: 6px 9px; border: 1px solid var(--border-md); border-radius: var(--radius-sm);
+    font-size: 13px; font-family: 'DM Mono', monospace; background: var(--bg);
+    color: var(--text); width: 100%; transition: border-color .12s;
+  }
+  .form-field input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+
+  /* TABS */
+  .tab-row { display: flex; gap: 6px; margin-bottom: 12px; }
+  .ctab {
+    font-size: 12px; padding: 5px 12px; border-radius: 20px;
+    border: 1px solid var(--border-md); cursor: pointer;
+    color: var(--text-2); background: transparent; font-family: 'DM Sans', sans-serif;
+    font-weight: 500; transition: all .12s;
+  }
+  .ctab.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+  /* ACTIONS */
+  .action-bar { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  .action-btn {
+    padding: 8px 14px; border-radius: var(--radius-sm); font-size: 12px;
+    font-family: 'DM Sans', sans-serif; font-weight: 500; cursor: pointer;
+    border: 1px solid var(--border-md); background: var(--surface); color: var(--text);
+    transition: all .12s;
+  }
+  .action-btn:hover { background: var(--bg); border-color: var(--accent); color: var(--accent); }
+  .action-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .action-btn.primary:hover { opacity: 0.9; }
+
+  /* ADD PROPERTY MODAL */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    z-index: 200; display: none; align-items: center; justify-content: center;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 24px; width: 520px; max-height: 90vh; overflow-y: auto;
+    border: 1px solid var(--border);
+  }
+  .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+  .modal-sub { font-size: 12px; color: var(--text-2); margin-bottom: 18px; }
+  .modal-section { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--text-3); margin: 14px 0 8px; }
+  .modal-actions { display: flex; gap: 8px; margin-top: 18px; justify-content: flex-end; }
+  .modal textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--border-md);
+    border-radius: var(--radius-sm); font-size: 12px; font-family: 'DM Sans', sans-serif;
+    background: var(--bg); color: var(--text); resize: vertical; min-height: 60px;
+  }
+  .modal select {
+    width: 100%; padding: 7px 9px; border: 1px solid var(--border-md);
+    border-radius: var(--radius-sm); font-size: 13px; font-family: 'DM Sans', sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+  .close-btn {
+    position: absolute; top: 12px; right: 14px; font-size: 18px; cursor: pointer;
+    color: var(--text-3); background: none; border: none; line-height: 1;
+  }
+
+  /* WATCHLIST VIEW */
+  .view-content { padding: 20px; max-width: 900px; }
+  .view-title { font-size: 20px; font-weight: 600; margin-bottom: 4px; letter-spacing: -0.02em; }
+  .view-sub { font-size: 13px; color: var(--text-2); margin-bottom: 20px; }
+  .watchlist-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+  .watch-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 14px; cursor: pointer; transition: border-color .12s;
+  }
+  .watch-card:hover { border-color: var(--accent); }
+  .watch-addr { font-size: 13px; font-weight: 500; margin-bottom: 2px; }
+  .watch-city { font-size: 11px; color: var(--text-3); margin-bottom: 10px; }
+  .watch-row { display: flex; justify-content: space-between; align-items: center; }
+  .tag-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .tag { font-size: 10px; padding: 2px 7px; border-radius: 4px; background: var(--surface2); color: var(--text-2); border: 1px solid var(--border); font-family: 'DM Mono', monospace; }
+  .empty-watch { text-align: center; padding: 3rem; color: var(--text-3); }
+  .empty-watch p { margin-bottom: 12px; font-size: 13px; }
+
+  /* ABOUT VIEW */
+  .about-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .about-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .about-card-icon { width: 32px; height: 32px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; margin-bottom: 10px; }
+  .about-card-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+  .about-card-desc { font-size: 12px; color: var(--text-2); line-height: 1.6; }
+  .api-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; }
+  .api-name { font-size: 13px; font-weight: 600; margin-bottom: 3px; }
+  .api-desc { font-size: 12px; color: var(--text-2); margin-bottom: 8px; }
+  .api-badge { font-size: 10px; font-family: 'DM Mono', monospace; padding: 2px 7px; border-radius: 4px; }
+  .badge-free { background: var(--green-bg); color: var(--green); }
+  .badge-paid { background: var(--amber-bg); color: var(--amber); }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Deal<span>Finder</span><span class="logo-sub">beta</span></div>
+  <div class="search-bar">
+    <input type="text" id="search_input" placeholder="Search city, address, or zip..." oninput="renderListings()">
+    <select id="sort_sel" onchange="renderListings()">
+      <option value="score">Sort: Deal score</option>
+      <option value="price_asc">Price: low → high</option>
+      <option value="price_desc">Price: high → low</option>
+      <option value="cf">Best cash flow</option>
+      <option value="cap">Best cap rate</option>
+    </select>
+  </div>
+  <div class="nav-pills">
+    <button class="nav-pill active" onclick="showView('search',this)">Search</button>
+    <button class="nav-pill" onclick="showView('watchlist',this)">Watchlist</button>
+    <button class="nav-pill" onclick="showView('about',this)">About</button>
+    <button class="nav-pill" onclick="openAddModal()" style="background:var(--accent);color:#fff;border-color:var(--accent)">+ Add deal</button>
+  </div>
+</div>
+
+<!-- SEARCH VIEW -->
+<div id="view_search" class="layout">
+  <div class="sidebar">
+    <div class="filter-bar">
+      <span class="filter-lbl">Type:</span>
+      <button class="fpill on" onclick="toggleF('sfr',this)">SFR</button>
+      <button class="fpill on" onclick="toggleF('multi',this)">Multi</button>
+      <button class="fpill on" onclick="toggleF('str',this)">STR</button>
+      <button class="fpill on" onclick="toggleF('flip',this)">Flip</button>
+    </div>
+    <div class="results-count" id="results_count">6 properties</div>
+    <div class="listings-list" id="listings_list"></div>
+  </div>
+  <div class="detail" id="detail_panel">
+    <div class="empty-detail" style="height:100%">
+      <div class="empty-icon">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 10 L10 3 L17 10 V17 H13 V13 H7 V17 H3 Z"/></svg>
+      </div>
+      <div style="font-size:13px">Select a property to analyze</div>
+      <div style="font-size:11px">Deal scoring updates live as you adjust inputs</div>
+    </div>
+  </div>
+</div>
+
+<!-- WATCHLIST VIEW -->
+<div id="view_watchlist" style="display:none;overflow-y:auto;height:calc(100vh - 52px)">
+  <div class="view-content">
+    <div class="view-title">Your watchlist</div>
+    <div class="view-sub">Properties you've saved for closer analysis</div>
+    <div id="watchlist_content"></div>
+  </div>
+</div>
+
+<!-- ABOUT VIEW -->
+<div id="view_about" style="display:none;overflow-y:auto;height:calc(100vh - 52px)">
+  <div class="view-content">
+    <div class="view-title">About DealFinder</div>
+    <div class="view-sub">The investor-first property analyzer. Built for cash flow, not curb appeal.</div>
+    <div class="about-grid">
+      <div class="about-card">
+        <div class="about-card-icon" style="background:var(--green-bg)">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--green)" stroke-width="1.5"><path d="M2 11 L5 7 L8 9 L11 4 L14 6"/></svg>
+        </div>
+        <div class="about-card-title">Real-time deal scoring</div>
+        <div class="about-card-desc">Every property gets an A–D grade based on cash flow, cap rate, and cash-on-cash return — not just list price.</div>
+      </div>
+      <div class="about-card">
+        <div class="about-card-icon" style="background:var(--blue-bg)">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--blue)" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+        </div>
+        <div class="about-card-title">5 built-in calculators</div>
+        <div class="about-card-desc">Cash flow, fix & flip, cap rate, BRRRR, and buy vs rent — all tuned to each property automatically.</div>
+      </div>
+      <div class="about-card">
+        <div class="about-card-icon" style="background:var(--amber-bg)">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="var(--amber)" stroke-width="1.5"><circle cx="8" cy="8" r="6"/><path d="M8 5v3l2 2"/></svg>
+        </div>
+        <div class="about-card-title">Add your own deals</div>
+        <div class="about-card-desc">Paste in any property — off-market, wholesaler, MLS — and analyze it in seconds. Saved locally in your browser.</div>
+      </div>
+    </div>
+    <div class="section-label">Connect real data (coming soon)</div>
+    <div class="api-box">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <div class="api-name">Rentcast API</div>
+        <span class="api-badge badge-paid">$49/mo</span>
+      </div>
+      <div class="api-desc">Real rent estimates, property details, and sales comps by address. Best fit for investor data.</div>
+      <a href="https://rentcast.io" target="_blank" style="font-size:11px;color:var(--accent)">rentcast.io →</a>
+    </div>
+    <div class="api-box">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <div class="api-name">Attom Data</div>
+        <span class="api-badge badge-paid">Custom pricing</span>
+      </div>
+      <div class="api-desc">Deep property records, tax assessments, foreclosure data, and neighborhood analytics.</div>
+      <a href="https://attomdata.com" target="_blank" style="font-size:11px;color:var(--accent)">attomdata.com →</a>
+    </div>
+    <div class="api-box">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">
+        <div class="api-name">HUD / Census data</div>
+        <span class="api-badge badge-free">Free</span>
+      </div>
+      <div class="api-desc">Fair market rents, neighborhood demographics, and housing market trends by zip code.</div>
+      <a href="https://huduser.gov" target="_blank" style="font-size:11px;color:var(--accent)">huduser.gov →</a>
+    </div>
+    <div style="margin-top:20px;padding:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);font-size:12px;color:var(--text-2);line-height:1.7">
+      <strong style="color:var(--text)">Built with DealFinder v1.0</strong><br>
+      Single-file app · No backend required · All calculations run in your browser · Deal data stored locally
+    </div>
+  </div>
+</div>
+
+<!-- ADD DEAL MODAL -->
+<div class="modal-backdrop" id="add_modal">
+  <div class="modal" style="position:relative">
+    <button class="close-btn" onclick="closeModal()">×</button>
+    <div class="modal-title">Add a property</div>
+    <div class="modal-sub">Enter the details manually — great for off-market and wholesaler deals</div>
+    <div class="form-grid2">
+      <div class="form-field" style="grid-column:1/-1"><label>Street address</label><input type="text" id="m_addr" placeholder="123 Main St"></div>
+    </div>
+    <div class="form-grid3">
+      <div class="form-field"><label>City, State</label><input type="text" id="m_city" placeholder="Austin, TX"></div>
+      <div class="form-field"><label>Zip</label><input type="text" id="m_zip" placeholder="78701"></div>
+      <div class="form-field"><label>Property type</label>
+        <select id="m_type"><option value="sfr">SFR</option><option value="multi">Multi-family</option><option value="str">STR / Airbnb</option><option value="flip">Fix & Flip</option></select>
+      </div>
+    </div>
+    <div class="modal-section">Financials</div>
+    <div class="form-grid3">
+      <div class="form-field"><label>Price ($)</label><input type="number" id="m_price" placeholder="250000"></div>
+      <div class="form-field"><label>Beds</label><input type="number" id="m_beds" placeholder="3"></div>
+      <div class="form-field"><label>Baths</label><input type="number" id="m_baths" placeholder="2"></div>
+    </div>
+    <div class="form-grid3">
+      <div class="form-field"><label>Sq ft</label><input type="number" id="m_sqft" placeholder="1500"></div>
+      <div class="form-field"><label>Year built</label><input type="number" id="m_year" placeholder="1990"></div>
+      <div class="form-field"><label>Est. rent/mo ($)</label><input type="number" id="m_rent" placeholder="2000"></div>
+    </div>
+    <div class="form-grid3">
+      <div class="form-field"><label>Property tax/yr ($)</label><input type="number" id="m_tax" placeholder="3000"></div>
+      <div class="form-field"><label>Insurance/yr ($)</label><input type="number" id="m_ins" placeholder="1200"></div>
+      <div class="form-field"><label>Maintenance/yr ($)</label><input type="number" id="m_maint" placeholder="2400"></div>
+    </div>
+    <div class="form-grid2">
+      <div class="form-field"><label>HOA/mo ($)</label><input type="number" id="m_hoa" placeholder="0"></div>
+      <div class="form-field"><label>Down payment (%)</label><input type="number" id="m_dp" placeholder="20"></div>
+    </div>
+    <div class="form-field" style="margin-bottom:8px"><label>Notes</label><textarea id="m_notes" placeholder="Off-market deal, needs cosmetic updates..."></textarea></div>
+    <div class="modal-actions">
+      <button class="action-btn" onclick="closeModal()">Cancel</button>
+      <button class="action-btn primary" onclick="addProperty()">Save & analyze</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS = [
+  ['#d4e8d4','#b8d9b8','#9cc99c','#80ba80'],
+  ['#c8dff5','#a8c8eb','#88b1e0','#6899d5'],
+  ['#f5e4c8','#ebd4a0','#e0c478','#d5b450'],
+  ['#e8d4e8','#d9b8d9','#c99cc9','#ba80ba'],
+  ['#d4e8e4','#b8d9d4','#9cc9c0','#80baac'],
+];
+
+let PROPS = [
+  {id:1,addr:'2847 Maple Grove Dr',city:'Austin, TX 78745',type:'sfr',price:319000,beds:3,baths:2,sqft:1480,rent:2400,yearBuilt:1987,hoa:0,tax:4200,ins:1600,maint:2800,mgmt:10,vac:7,rate:7.1,dp:20,term:30,desc:'Well-maintained ranch in South Austin. Tenant occupied, lease through Dec. Strong rental demand in zip.',colorIdx:0,watchlisted:false},
+  {id:2,addr:'1104 Riverside Blvd #A-D',city:'Nashville, TN 37206',type:'multi',price:540000,beds:8,baths:4,sqft:3200,rent:5600,yearBuilt:1962,hoa:0,tax:7200,ins:3200,maint:6000,mgmt:10,vac:8,rate:7.25,dp:25,term:30,desc:'Four-unit building, all 2/1s. Three units renovated. One unit month-to-month. Strong East Nashville appreciation.',colorIdx:1,watchlisted:false},
+  {id:3,addr:'88 Beachside Cove',city:'Destin, FL 32541',type:'str',price:485000,beds:3,baths:2,sqft:1750,rent:6200,yearBuilt:2019,hoa:420,tax:5800,ins:4200,maint:3600,mgmt:20,vac:26,rate:7.5,dp:20,term:30,desc:'Gulf-view condo with STR permit. Currently operating on Airbnb. Avg 74% occupancy. Fully furnished.',colorIdx:2,watchlisted:false},
+  {id:4,addr:'3312 Elmwood Ave',city:'Memphis, TN 38111',type:'sfr',price:127000,beds:3,baths:1,sqft:1200,rent:1350,yearBuilt:1958,hoa:0,tax:1800,ins:900,maint:2400,mgmt:10,vac:9,rate:7.0,dp:20,term:30,desc:'Solid brick home in stable rental neighborhood. Needs light cosmetic updates. C+ area with strong cash flow.',colorIdx:3,watchlisted:false},
+  {id:5,addr:'510 Old Mill Rd',city:'Birmingham, AL 35205',type:'flip',price:89000,beds:3,baths:2,sqft:1560,rent:0,yearBuilt:1971,hoa:0,tax:1400,ins:0,maint:0,mgmt:0,vac:0,rate:7.0,dp:20,term:30,desc:'Distressed property, ARV est. $165k. Needs full rehab ~$38k. Good bones, off-market via wholesaler.',colorIdx:4,arv:165000,rehab:38000,watchlisted:false},
+  {id:6,addr:'921 Clover Fields Ct',city:'Columbus, OH 43214',type:'sfr',price:244000,beds:4,baths:2,sqft:1900,rent:2050,yearBuilt:2001,hoa:0,tax:3600,ins:1400,maint:2200,mgmt:10,vac:6,rate:7.1,dp:20,term:30,desc:'Four-bed in high-demand school district. Newer roof and HVAC. Ideal for long-term buy-and-hold.',colorIdx:0,watchlisted:false},
+];
+
+let nextId = 100;
+let activeFilters = ['sfr','multi','str','flip'];
+let activeId = null;
+let activeTab = 'cashflow';
+let currentView = 'search';
+
+// Load saved props from localStorage
+try {
+  const saved = localStorage.getItem('df_props');
+  if (saved) { const s = JSON.parse(saved); PROPS = [...PROPS, ...s]; nextId = Math.max(nextId, ...s.map(x=>x.id)) + 1; }
+} catch(e) {}
+
+function saveToStorage() {
+  try { localStorage.setItem('df_props', JSON.stringify(PROPS.filter(p=>p.id>=100))); } catch(e) {}
+}
+
+function mort(p,ar,y){const r=ar/100/12,n=y*12;if(r===0)return p/n;return p*(r*Math.pow(1+r,n))/(Math.pow(1+r,n)-1);}
+function fmt(n){return '$'+Math.round(n).toLocaleString();}
+function pct(n){return (Math.round(n*10)/10)+'%';}
+
+function calcScore(p) {
+  if (p.type === 'flip') {
+    const rehab = p.rehab || 38000, arv = p.arv || p.price * 1.5;
+    const total = p.price + p.price*0.02 + rehab + (p.price*0.015)*3;
+    const profit = arv*0.92 - total;
+    const roi = profit/total*100;
+    if(roi>25) return {grade:'A',score:88,color:'var(--green)',bg:'var(--green-bg)'};
+    if(roi>15) return {grade:'B',score:70,color:'var(--blue)',bg:'var(--blue-bg)'};
+    if(roi>8)  return {grade:'C',score:52,color:'var(--amber)',bg:'var(--amber-bg)'};
+    return {grade:'D',score:30,color:'var(--red)',bg:'var(--red-bg)'};
+  }
+  const loan = p.price*(1-p.dp/100), pi = mort(loan, p.rate, p.term);
+  const eff = p.rent*(1-p.vac/100);
+  const exp = pi+(p.tax+p.ins+p.maint)/12+p.rent*(p.mgmt/100)+(p.hoa||0);
+  const cf = eff - exp;
+  const coc = (cf*12)/(p.price*(p.dp/100))*100;
+  const capRate = (p.rent*12*(1-p.vac/100)-(p.tax+p.ins+p.maint+(p.hoa||0)*12))/p.price*100;
+  const s = Math.min(99, Math.max(10, 48 + coc*7 + capRate*3 + (cf>0?12:0)));
+  if(s>=78) return {grade:'A',score:Math.round(s),color:'var(--green)',bg:'var(--green-bg)'};
+  if(s>=62) return {grade:'B',score:Math.round(s),color:'var(--blue)',bg:'var(--blue-bg)'};
+  if(s>=46) return {grade:'C',score:Math.round(s),color:'var(--amber)',bg:'var(--amber-bg)'};
+  return {grade:'D',score:Math.round(s),color:'var(--red)',bg:'var(--red-bg)'};
+}
+
+function getFiltered() {
+  const q = (document.getElementById('search_input').value||'').toLowerCase();
+  const sort = document.getElementById('sort_sel').value;
+  let list = PROPS.filter(p => activeFilters.includes(p.type) &&
+    (p.addr.toLowerCase().includes(q)||p.city.toLowerCase().includes(q)||(p.city.split(' ').pop()||'').includes(q)));
+  list = list.map(p => ({...p, sc: calcScore(p)}));
+  if(sort==='score') list.sort((a,b)=>b.sc.score-a.sc.score);
+  else if(sort==='price_asc') list.sort((a,b)=>a.price-b.price);
+  else if(sort==='price_desc') list.sort((a,b)=>b.price-a.price);
+  else if(sort==='cf') list.sort((a,b)=>{
+    const cf=p=>{const l=p.price*(1-p.dp/100),pi=mort(l,p.rate,p.term);return p.rent*(1-p.vac/100)-pi-(p.tax+p.ins+p.maint)/12-p.rent*(p.mgmt/100)-(p.hoa||0);};
+    return cf(b)-cf(a);
+  });
+  else if(sort==='cap') list.sort((a,b)=>{
+    const cap=p=>(p.rent*12*(1-p.vac/100)-(p.tax+p.ins+p.maint))/p.price*100;
+    return cap(b)-cap(a);
+  });
+  return list;
+}
+
+function thumbSVG(p) {
+  const c = COLORS[p.colorIdx % COLORS.length];
+  return `<div class="prop-thumb">
+    <div class="prop-thumb-grid">
+      <div class="thumb-cell" style="background:${c[0]}"></div>
+      <div class="thumb-cell" style="background:${c[1]};grid-row:1/3"></div>
+      <div class="thumb-cell" style="background:${c[2]}"></div>
+    </div>
+    <div class="badge-type">${p.type==='multi'?'MULTI':p.type==='str'?'STR':p.type==='flip'?'FLIP':'SFR'}</div>
+  </div>`;
+}
+
+function renderListings() {
+  const list = getFiltered();
+  document.getElementById('results_count').textContent = `${list.length} propert${list.length===1?'y':'ies'}`;
+  if (!list.length) {
+    document.getElementById('listings_list').innerHTML = '<div style="padding:2rem;text-align:center;font-size:12px;color:var(--text-3)">No properties match your filters</div>';
+    return;
+  }
+  document.getElementById('listings_list').innerHTML = list.map(p => {
+    const sc = p.sc;
+    return `<div class="prop-card${p.id===activeId?' active':''}" onclick="selectProp(${p.id})">
+      ${thumbSVG(p)}
+      <div class="prop-addr">${p.addr}</div>
+      <div class="prop-city">${p.city}</div>
+      <div class="prop-footer">
+        <div class="prop-price">${fmt(p.price)}</div>
+        <div class="deal-grade grade-${sc.grade}">${sc.grade} · ${sc.score}</div>
+      </div>
+      <div class="prop-meta">
+        <span>${p.beds}bd/${p.baths}ba</span>
+        <span>·</span>
+        <span>${p.sqft.toLocaleString()} sqft</span>
+        ${p.rent?`<span>·</span><span>${fmt(p.rent)}/mo</span>`:''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function selectProp(id) {
+  activeId = id;
+  activeTab = 'cashflow';
+  renderListings();
+  renderDetail(id);
+}
+
+function renderDetail(id) {
+  const p = PROPS.find(x => x.id === id);
+  if (!p) return;
+  const sc = calcScore(p);
+  const loan = p.price*(1-p.dp/100), pi = mort(loan, p.rate, p.term);
+  const eff = p.rent*(1-p.vac/100);
+  const monthExp = pi+(p.tax+p.ins+p.maint)/12+p.rent*(p.mgmt/100)+(p.hoa||0);
+  const cf = eff - monthExp;
+  const coc = (cf*12)/(p.price*(p.dp/100))*100;
+  const noi = p.rent*12*(1-p.vac/100)-(p.tax+p.ins+p.maint+(p.hoa||0)*12);
+  const capRate = noi/p.price*100;
+  const grm = p.price/(p.rent*12||1);
+  const isFlip = p.type === 'flip';
+  const c = COLORS[p.colorIdx%COLORS.length];
+
+  const heroHtml = `<div class="detail-hero">
+    <div class="hero-grid">
+      <div class="hero-cell" style="background:${c[0]};grid-row:1/3"></div>
+      <div class="hero-cell" style="background:${c[1]}"></div>
+      <div class="hero-cell" style="background:${c[2]}"></div>
+    </div>
+    <div class="hero-overlay"></div>
+    <div class="hero-info">
+      <div class="hero-addr">${p.addr}</div>
+      <div class="hero-city">${p.city} · ${p.beds}bd/${p.baths}ba · ${p.sqft.toLocaleString()} sqft · Built ${p.yearBuilt}</div>
+    </div>
+  </div>`;
+
+  const scoreBanner = `<div class="score-banner">
+    <div class="score-circle" style="border-color:${sc.color}">
+      <div class="score-num" style="color:${sc.color}">${sc.score}</div>
+      <div class="score-lbl">score</div>
+    </div>
+    <div class="score-info">
+      <div class="score-title"><span class="deal-grade grade-${sc.grade}" style="margin-right:8px">${sc.grade}-grade deal</span>${p.type==='multi'?'Multi-family':p.type==='str'?'Short-term rental':p.type==='flip'?'Fix & flip':'Single-family rental'}</div>
+      <div class="score-desc">${p.desc}</div>
+    </div>
+    <div class="price-big">${fmt(p.price)}</div>
+  </div>`;
+
+  let keyMetrics = '';
+  if (!isFlip) {
+    keyMetrics = `<div class="section-label">Key metrics</div>
+    <div class="metrics-row metrics-4">
+      <div class="metric"><div class="metric-lbl">Est. rent</div><div class="metric-val">${fmt(p.rent)}/mo</div></div>
+      <div class="metric"><div class="metric-lbl">NOI / yr</div><div class="metric-val ${noi>0?'val-pos':'val-neg'}">${fmt(noi)}</div></div>
+      <div class="metric"><div class="metric-lbl">Cap rate</div><div class="metric-val ${capRate>0?'val-pos':'val-neg'}">${pct(capRate)}</div></div>
+      <div class="metric"><div class="metric-lbl">GRM</div><div class="metric-val val-neu">${(Math.round(grm*10)/10).toFixed(1)}x</div></div>
+    </div>`;
+  }
+
+  let calcSection = '';
+  if (isFlip) {
+    const rehab = p.rehab||38000, arv = p.arv||165000;
+    const totalIn = p.price + p.price*0.02 + rehab + p.price*0.015*4;
+    const profit = arv*0.92 - totalIn;
+    const roi = profit/totalIn*100;
+    calcSection = `<div class="section-label">Fix & flip analysis</div>
+    <div class="calc-card">
+      <div class="form-grid2">
+        <div class="form-field"><label>After repair value ($)</label><input type="number" value="${arv}" id="d_arv" oninput="updateFlip(${id})"></div>
+        <div class="form-field"><label>Rehab cost ($)</label><input type="number" value="${rehab}" id="d_rehab" oninput="updateFlip(${id})"></div>
+      </div>
+      <div class="form-grid3">
+        <div class="form-field"><label>Holding months</label><input type="number" value="4" id="d_holdmo" oninput="updateFlip(${id})"></div>
+        <div class="form-field"><label>Holding cost/mo ($)</label><input type="number" value="${Math.round(p.price*0.015)}" id="d_holdcost" oninput="updateFlip(${id})"></div>
+        <div class="form-field"><label>Sell closing (%)</label><input type="number" value="8" id="d_sellclose" oninput="updateFlip(${id})"></div>
+      </div>
+      <div class="metrics-row metrics-3" id="flip_metrics">
+        <div class="metric"><div class="metric-lbl">Total invested</div><div class="metric-val val-neu" id="d_totalin">${fmt(totalIn)}</div></div>
+        <div class="metric"><div class="metric-lbl">Net profit</div><div class="metric-val ${profit>0?'val-pos':'val-neg'}" id="d_profit">${fmt(profit)}</div></div>
+        <div class="metric"><div class="metric-lbl">ROI</div><div class="metric-val ${roi>0?'val-pos':'val-neg'}" id="d_roi">${pct(roi)}</div></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-3);margin-top:4px">70% rule max purchase price: <strong style="color:var(--text);font-family:'DM Mono',monospace">${fmt(arv*0.7-rehab)}</strong></div>
+    </div>`;
+  } else {
+    const bArv = Math.round(p.price*1.15), bRehab = Math.round(p.price*0.08);
+    const bRefi = bArv*0.75, bLeft = (p.price+bRehab)-bRefi;
+    const bPi = mort(bRefi, p.rate, 30);
+    const bCf = eff - bPi - monthExp + pi;
+    calcSection = `<div class="section-label">Investor analysis</div>
+    <div class="tab-row">
+      <button class="ctab ${activeTab==='cashflow'?'on':''}" onclick="switchTab('cashflow',this,${id})">Cash flow</button>
+      <button class="ctab ${activeTab==='brrrr'?'on':''}" onclick="switchTab('brrrr',this,${id})">BRRRR</button>
+    </div>
+    ${activeTab==='cashflow'?`<div class="calc-card">
+      <div class="form-grid3">
+        <div class="form-field"><label>Monthly rent ($)</label><input type="number" value="${p.rent}" id="d_rent" oninput="updateCF(${id})"></div>
+        <div class="form-field"><label>Vacancy (%)</label><input type="number" value="${p.vac}" id="d_vac" oninput="updateCF(${id})"></div>
+        <div class="form-field"><label>Down payment (%)</label><input type="number" value="${p.dp}" id="d_dp" oninput="updateCF(${id})"></div>
+      </div>
+      <div class="form-grid3">
+        <div class="form-field"><label>Interest rate (%)</label><input type="number" value="${p.rate}" step="0.1" id="d_rate" oninput="updateCF(${id})"></div>
+        <div class="form-field"><label>Mgmt fee (%)</label><input type="number" value="${p.mgmt}" id="d_mgmt" oninput="updateCF(${id})"></div>
+        <div class="form-field"><label>HOA/mo ($)</label><input type="number" value="${p.hoa||0}" id="d_hoa" oninput="updateCF(${id})"></div>
+      </div>
+      <div class="metrics-row metrics-4" id="cf_metrics">
+        <div class="metric"><div class="metric-lbl">P&I / mo</div><div class="metric-val val-neu" id="d_pi">${fmt(pi)}</div></div>
+        <div class="metric"><div class="metric-lbl">Cash flow / mo</div><div class="metric-val ${cf>0?'val-pos':'val-neg'}" id="d_cf">${fmt(cf)}</div></div>
+        <div class="metric"><div class="metric-lbl">CoC return</div><div class="metric-val ${coc>0?'val-pos':'val-neg'}" id="d_coc">${pct(coc)}</div></div>
+        <div class="metric"><div class="metric-lbl">Annual cash flow</div><div class="metric-val ${cf>0?'val-pos':'val-neg'}" id="d_annual">${fmt(cf*12)}</div></div>
+      </div>
+    </div>`:`<div class="calc-card">
+      <div class="form-grid3">
+        <div class="form-field"><label>ARV after rehab ($)</label><input type="number" value="${bArv}" id="b_arv" oninput="updateBRRRR(${id})"></div>
+        <div class="form-field"><label>Rehab cost ($)</label><input type="number" value="${bRehab}" id="b_rehab" oninput="updateBRRRR(${id})"></div>
+        <div class="form-field"><label>Refi LTV (%)</label><input type="number" value="75" id="b_ltv" oninput="updateBRRRR(${id})"></div>
+      </div>
+      <div class="metrics-row metrics-3" id="brrrr_metrics">
+        <div class="metric"><div class="metric-lbl">Refi loan</div><div class="metric-val val-neu" id="b_refi">${fmt(bRefi)}</div></div>
+        <div class="metric"><div class="metric-lbl">Cash left in deal</div><div class="metric-val ${bLeft<=0?'val-pos':'val-neg'}" id="b_left">${fmt(bLeft)}</div></div>
+        <div class="metric"><div class="metric-lbl">New cash flow/mo</div><div class="metric-val ${bCf>0?'val-pos':'val-neg'}" id="b_cf">${fmt(bCf)}</div></div>
+      </div>
+      <div style="font-size:11px;color:var(--text-3);margin-top:4px">Infinite return achieved when cash left in deal ≤ $0</div>
+    </div>`}`;
+  }
+
+  const wl = p.watchlisted;
+  const actions = `<div class="action-bar">
+    <button class="action-btn primary" onclick="toggleWatch(${id})" id="watch_btn">${wl?'★ Watchlisted':'☆ Add to watchlist'}</button>
+    <button class="action-btn" onclick="removeProp(${id})" ${p.id<100?'style="display:none"':''}>Remove</button>
+  </div>`;
+
+  document.getElementById('detail_panel').innerHTML = heroHtml + `<div class="detail-content">${scoreBanner}${keyMetrics}${calcSection}${actions}</div>`;
+}
+
+function switchTab(tab, el, id) {
+  activeTab = tab;
+  document.querySelectorAll('.ctab').forEach(t => t.classList.remove('on'));
+  el.classList.add('on');
+  renderDetail(id);
+}
+
+function updateCF(id) {
+  const p = PROPS.find(x => x.id === id);
+  const rent = parseFloat(document.getElementById('d_rent').value)||p.rent;
+  const vac = parseFloat(document.getElementById('d_vac').value)||p.vac;
+  const dp = parseFloat(document.getElementById('d_dp').value)||p.dp;
+  const rate = parseFloat(document.getElementById('d_rate').value)||p.rate;
+  const mgmt = parseFloat(document.getElementById('d_mgmt').value)||p.mgmt;
+  const hoa = parseFloat(document.getElementById('d_hoa').value)||0;
+  const loan = p.price*(1-dp/100), pi = mort(loan, rate, 30);
+  const eff = rent*(1-vac/100);
+  const exp = pi+(p.tax+p.ins+p.maint)/12+rent*(mgmt/100)+hoa;
+  const cf = eff-exp, coc = (cf*12)/(p.price*(dp/100))*100;
+  const g = id => document.getElementById(id);
+  g('d_pi').textContent = fmt(pi);
+  g('d_cf').textContent = fmt(cf); g('d_cf').className = 'metric-val '+(cf>0?'val-pos':'val-neg');
+  g('d_coc').textContent = pct(coc); g('d_coc').className = 'metric-val '+(coc>0?'val-pos':'val-neg');
+  g('d_annual').textContent = fmt(cf*12); g('d_annual').className = 'metric-val '+(cf>0?'val-pos':'val-neg');
+}
+
+function updateBRRRR(id) {
+  const p = PROPS.find(x => x.id === id);
+  const arv = parseFloat(document.getElementById('b_arv').value)||p.price*1.15;
+  const rehab = parseFloat(document.getElementById('b_rehab').value)||0;
+  const ltv = parseFloat(document.getElementById('b_ltv').value)||75;
+  const refi = arv*(ltv/100), left = (p.price+rehab)-refi;
+  const bpi = mort(refi, p.rate, 30);
+  const loan = p.price*(1-p.dp/100), pi = mort(loan, p.rate, p.term);
+  const eff = p.rent*(1-p.vac/100);
+  const exp = (p.tax+p.ins+p.maint)/12+p.rent*(p.mgmt/100)+(p.hoa||0);
+  const cf = eff-bpi-exp;
+  const g = id => document.getElementById(id);
+  g('b_refi').textContent = fmt(refi);
+  g('b_left').textContent = fmt(left); g('b_left').className = 'metric-val '+(left<=0?'val-pos':'val-neg');
+  g('b_cf').textContent = fmt(cf); g('b_cf').className = 'metric-val '+(cf>0?'val-pos':'val-neg');
+}
+
+function updateFlip(id) {
+  const p = PROPS.find(x => x.id === id);
+  const arv = parseFloat(document.getElementById('d_arv').value)||165000;
+  const rehab = parseFloat(document.getElementById('d_rehab').value)||38000;
+  const holdMo = parseFloat(document.getElementById('d_holdmo').value)||4;
+  const holdCost = parseFloat(document.getElementById('d_holdcost').value)||1500;
+  const sellPct = parseFloat(document.getElementById('d_sellclose').value)||8;
+  const totalIn = p.price + p.price*0.02 + rehab + holdMo*holdCost;
+  const profit = arv*(1-sellPct/100) - totalIn;
+  const roi = profit/totalIn*100;
+  const g = id => document.getElementById(id);
+  g('d_totalin').textContent = fmt(totalIn);
+  g('d_profit').textContent = fmt(profit); g('d_profit').className = 'metric-val '+(profit>0?'val-pos':'val-neg');
+  g('d_roi').textContent = pct(roi); g('d_roi').className = 'metric-val '+(roi>0?'val-pos':'val-neg');
+}
+
+function toggleWatch(id) {
+  const p = PROPS.find(x => x.id === id);
+  p.watchlisted = !p.watchlisted;
+  saveToStorage();
+  const btn = document.getElementById('watch_btn');
+  if (btn) btn.textContent = p.watchlisted ? '★ Watchlisted' : '☆ Add to watchlist';
+}
+
+function removeProp(id) {
+  PROPS = PROPS.filter(p => p.id !== id);
+  saveToStorage();
+  activeId = null;
+  document.getElementById('detail_panel').innerHTML = '<div class="empty-detail" style="height:100%"><div style="font-size:13px;color:var(--text-3)">Property removed</div></div>';
+  renderListings();
+}
+
+function toggleF(f, el) {
+  const i = activeFilters.indexOf(f);
+  if(i>-1) activeFilters.splice(i,1); else activeFilters.push(f);
+  el.classList.toggle('on');
+  renderListings();
+}
+
+function showView(v, el) {
+  currentView = v;
+  document.getElementById('view_search').style.display = v==='search'?'flex':'none';
+  document.getElementById('view_watchlist').style.display = v==='watchlist'?'block':'none';
+  document.getElementById('view_about').style.display = v==='about'?'block':'none';
+  document.querySelectorAll('.nav-pill').forEach(p=>p.classList.remove('active'));
+  if(el) el.classList.add('active');
+  if(v==='watchlist') renderWatchlist();
+}
+
+function renderWatchlist() {
+  const watched = PROPS.filter(p => p.watchlisted);
+  const el = document.getElementById('watchlist_content');
+  if (!watched.length) {
+    el.innerHTML = '<div class="empty-watch"><p>No properties watchlisted yet.</p><p style="font-size:11px">Click "Add to watchlist" on any property to save it here.</p></div>';
+    return;
+  }
+  el.innerHTML = `<div class="watchlist-grid">${watched.map(p=>{
+    const sc = calcScore(p);
+    const loan = p.price*(1-p.dp/100), pi = mort(loan,p.rate,p.term);
+    const cf = p.rent*(1-p.vac/100)-pi-(p.tax+p.ins+p.maint)/12-p.rent*(p.mgmt/100)-(p.hoa||0);
+    return `<div class="watch-card" onclick="showView('search',document.querySelectorAll('.nav-pill')[0]);setTimeout(()=>selectProp(${p.id}),50)">
+      <div class="watch-addr">${p.addr}</div>
+      <div class="watch-city">${p.city}</div>
+      <div class="watch-row">
+        <div class="prop-price">${fmt(p.price)}</div>
+        <div class="deal-grade grade-${sc.grade}">${sc.grade} · ${sc.score}</div>
+      </div>
+      <div class="tag-row">
+        ${p.type!=='flip'?`<span class="tag">CF ${fmt(cf)}/mo</span>`:''}
+        <span class="tag">${p.beds}bd/${p.baths}ba</span>
+        <span class="tag">${p.sqft.toLocaleString()} sqft</span>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+function openAddModal() { document.getElementById('add_modal').classList.add('open'); }
+function closeModal() { document.getElementById('add_modal').classList.remove('open'); }
+
+function addProperty() {
+  const get = id => document.getElementById(id).value;
+  const addr = get('m_addr').trim();
+  const city = get('m_city').trim() + ' ' + get('m_zip').trim();
+  if (!addr || !get('m_price')) { alert('Please enter at least an address and price.'); return; }
+  const newProp = {
+    id: nextId++,
+    addr: addr,
+    city: city.trim(),
+    type: get('m_type'),
+    price: parseFloat(get('m_price'))||0,
+    beds: parseInt(get('m_beds'))||3,
+    baths: parseInt(get('m_baths'))||2,
+    sqft: parseInt(get('m_sqft'))||1200,
+    rent: parseFloat(get('m_rent'))||0,
+    yearBuilt: parseInt(get('m_year'))||2000,
+    hoa: parseFloat(get('m_hoa'))||0,
+    tax: parseFloat(get('m_tax'))||3000,
+    ins: parseFloat(get('m_ins'))||1200,
+    maint: parseFloat(get('m_maint'))||2400,
+    mgmt: 10, vac: 8, rate: 7.0, dp: parseFloat(get('m_dp'))||20, term: 30,
+    desc: get('m_notes')||'User-added property.',
+    colorIdx: Math.floor(Math.random()*COLORS.length),
+    watchlisted: false,
+  };
+  PROPS.push(newProp);
+  saveToStorage();
+  closeModal();
+  activeFilters = [...new Set([...activeFilters, newProp.type])];
+  renderListings();
+  setTimeout(() => selectProp(newProp.id), 100);
+}
+
+document.getElementById('add_modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+renderListings();
+</script>
+</body>
+</html>
