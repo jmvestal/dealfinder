@@ -682,6 +682,11 @@ function renderDetail(id) {
         <div class="form-field"><label>Mgmt fee (%)</label><input type="number" value="${p.mgmt}" id="d_mgmt" oninput="updateCF(${id})"></div>
         <div class="form-field"><label>HOA/mo ($)</label><input type="number" value="${p.hoa||0}" id="d_hoa" oninput="updateCF(${id})"></div>
       </div>
+      <div class="form-grid3">
+        <div class="form-field"><label>Property tax/yr ($)</label><input type="number" value="${p.tax||0}" id="d_tax" oninput="updateCF(${id})"></div>
+        <div class="form-field"><label>Insurance/yr ($)</label><input type="number" value="${p.ins||0}" id="d_ins" oninput="updateCF(${id})"></div>
+        <div class="form-field"><label>Maintenance/yr ($)</label><input type="number" value="${p.maint||0}" id="d_maint" oninput="updateCF(${id})"></div>
+      </div>
       <div class="metrics-row metrics-4" id="cf_metrics">
         <div class="metric"><div class="metric-lbl">P&I / mo</div><div class="metric-val val-neu" id="d_pi">${fmt(pi)}</div></div>
         <div class="metric"><div class="metric-lbl">Cash flow / mo</div><div class="metric-val ${cf>0?'val-pos':'val-neg'}" id="d_cf">${fmt(cf)}</div></div>
@@ -727,9 +732,12 @@ function updateCF(id) {
   const rate = parseFloat(document.getElementById('d_rate').value)||p.rate;
   const mgmt = parseFloat(document.getElementById('d_mgmt').value)||p.mgmt;
   const hoa = parseFloat(document.getElementById('d_hoa').value)||0;
+  const tax = parseFloat(document.getElementById('d_tax').value)||p.tax||0;
+  const ins = parseFloat(document.getElementById('d_ins').value)||p.ins||0;
+  const maint = parseFloat(document.getElementById('d_maint').value)||p.maint||0;
   const loan = p.price*(1-dp/100), pi = mort(loan, rate, 30);
   const eff = rent*(1-vac/100);
-  const exp = pi+(p.tax+p.ins+p.maint)/12+rent*(mgmt/100)+hoa;
+  const exp = pi+(tax+ins+maint)/12+rent*(mgmt/100)+hoa;
   const cf = eff-exp, coc = (cf*12)/(p.price*(dp/100))*100;
   const g = id => document.getElementById(id);
   g('d_pi').textContent = fmt(pi);
