@@ -467,7 +467,7 @@ function renderWatchlist(){
 
 function openAddModal(){
   document.getElementById('add_modal').classList.add('open');
-  setTimeout(attachAutocomplete,200);
+  attachAutocomplete();
 }
 function closeModal(){document.getElementById('add_modal').classList.remove('open');}
 
@@ -490,9 +490,14 @@ function addProperty(){
 
 document.getElementById('add_modal').addEventListener('click',function(e){if(e.target===this)closeModal();});
 
-function attachAutocomplete(){
+function attachAutocomplete(tries){
+  tries=tries||0;
   const input=document.getElementById('m_addr');
-  if(!input||input.dataset.acDone||!window.google)return;
+  if(!input||input.dataset.acDone)return;
+  if(!window.google||!window.google.maps||!window.google.maps.places){
+    if(tries<20)setTimeout(()=>attachAutocomplete(tries+1),500);
+    return;
+  }
   input.dataset.acDone='1';
   const ac=new google.maps.places.Autocomplete(input,{
     types:['address'],componentRestrictions:{country:'us'},fields:['address_components']
