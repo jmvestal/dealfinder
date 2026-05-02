@@ -505,6 +505,15 @@ function renderWatchlist(){
 }
 
 function openAddModal(){
+  ['m_addr','m_city','m_zip','m_price','m_beds','m_baths','m_sqft','m_year','m_rent','m_tax','m_ins','m_maint','m_hoa','m_dp','m_notes'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.value='';
+  });
+  document.getElementById('m_type').value='sfr';
+  const saveBtn=document.querySelector('#add_modal .action-btn.primary');
+  if(saveBtn){saveBtn.textContent='Save & analyze';saveBtn.disabled=false;}
+  // Reset autocomplete so it re-attaches to the cleared input
+  const addr=document.getElementById('m_addr');
+  if(addr)addr.dataset.acDone='';
   document.getElementById('add_modal').classList.add('open');
   attachAutocomplete();
 }
