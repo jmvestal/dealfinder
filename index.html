@@ -538,6 +538,8 @@ async function attachAutocomplete(tries){
     pac.addEventListener('gmp-placeselect',async({place})=>{
       try{
         try{await place.fetchFields({fields:['addressComponents','formattedAddress']});}catch(fe){console.warn('fetchFields:',fe);}
+        // pac.value updates after the event fires — wait a tick so it reflects the selected address
+        await new Promise(r=>setTimeout(r,80));
         let num='',street='',city='',state='',zip='';
         for(const c of place.addressComponents||[]){
           const t=c.types||[];
@@ -547,11 +549,12 @@ async function attachAutocomplete(tries){
           if(t.includes('administrative_area_level_1'))state=c.shortText||'';
           if(t.includes('postal_code'))zip=c.longText||'';
         }
+        // fallback: parse the full address text shown in the autocomplete input
         const fullText=(place.formattedAddress||pac.value||'').replace(/,\s*USA$/i,'');
         if(!city&&fullText){
           const parts=fullText.split(',').map(s=>s.trim());
           if(parts.length>=2)city=parts[1]||'';
-          if(parts.length>=3){const sz=(parts[2]||'').split(' ');state=sz[0]||'';if(!zip)zip=sz[1]||'';}
+          if(parts.length>=3){const sz=(parts[2]||'').trim().split(/\s+/);state=sz[0]||'';if(!zip)zip=sz[1]||'';}
         }
         input.value=(num+' '+street).trim()||fullText.split(',')[0].trim();
         const cityEl=document.getElementById('m_city');
@@ -562,7 +565,7 @@ async function attachAutocomplete(tries){
         const saveBtn=document.querySelector('#add_modal .action-btn.primary');
         if(saveBtn){saveBtn.textContent='Fetching property data...';saveBtn.disabled=true;}
 
-        const fullAddr=(place.formattedAddress||'').replace(/,\s*USA$/,'');
+        const fullAddr=(place.formattedAddress||pac.value||'').replace(/,\s*USA$/i,'');
         const data=await fetchPropertyData(fullAddr);
         if(data){
           const set=(id,v)=>{if(v!=null&&v!==''){const el=document.getElementById(id);if(el)el.value=v;}};
