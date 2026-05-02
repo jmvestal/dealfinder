@@ -536,7 +536,7 @@ async function attachAutocomplete(tries){
     input.parentNode.insertBefore(pac,input);
     input.style.display='none';
     pac.addEventListener('gmp-placeselect',async({place})=>{
-      console.log('[DF] place selected id=',place.id,'displayName=',place.displayName);
+      console.error('[DF] place selected id=',place.id,'displayName=',place.displayName);
       try{
         let num='',street='',city='',state='',zip='',formattedAddr='';
 
@@ -552,7 +552,7 @@ async function attachAutocomplete(tries){
             if(t.includes('administrative_area_level_1'))state=c.shortText||'';
             if(t.includes('postal_code'))zip=c.longText||'';
           }
-          console.log('[DF] fetchFields OK city=',city,'state=',state,'zip=',zip);
+          console.error('[DF] fetchFields OK city=',city,'state=',state,'zip=',zip);
         }catch(fe){console.error('[DF] fetchFields failed:',fe.message||fe);}
 
         // Strategy 2: direct REST call to Places API (New)
@@ -560,7 +560,7 @@ async function attachAutocomplete(tries){
           try{
             const r=await fetch(`https://places.googleapis.com/v1/places/${place.id}?fields=addressComponents,formattedAddress&key=AIzaSyBv9d9qF-RERlNWeIihuFCKFr1yH0gfI2g`);
             const d=await r.json();
-            console.log('[DF] REST status=',r.status,'body=',JSON.stringify(d).slice(0,300));
+            console.error('[DF] REST status=',r.status,'body=',JSON.stringify(d).slice(0,300));
             if(r.ok){
               formattedAddr=d.formattedAddress||'';
               for(const c of d.addressComponents||[]){
@@ -575,7 +575,7 @@ async function attachAutocomplete(tries){
           }catch(re){console.error('[DF] REST failed:',re.message);}
         }
 
-        console.log('[DF] final city=',city,'state=',state,'zip=',zip,'addr=',formattedAddr);
+        console.error('[DF] final city=',city,'state=',state,'zip=',zip,'addr=',formattedAddr);
         input.value=(num&&street?(num+' '+street).trim():num||street)||formattedAddr.split(',')[0].trim();
         const cityEl=document.getElementById('m_city');
         const zipEl=document.getElementById('m_zip');
