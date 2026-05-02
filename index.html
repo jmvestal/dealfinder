@@ -130,11 +130,8 @@
   .api-badge{font-size:10px;font-family:'DM Mono',monospace;padding:2px 7px;border-radius:4px}
   .badge-free{background:var(--green-bg);color:var(--green)}
   .badge-paid{background:var(--amber-bg);color:var(--amber)}
-  .pac-container{z-index:9999!important;font-family:'DM Sans',sans-serif;border:1px solid var(--border-md);border-radius:var(--radius-sm);box-shadow:0 4px 16px rgba(0,0,0,0.12)}
-  .pac-item{padding:6px 10px;font-size:13px;cursor:pointer;color:var(--text)}
-  .pac-item:hover{background:var(--bg)}
-  .pac-item-query{font-size:13px;color:var(--text)}
-  .pac-matched{font-weight:600}
+  gmp-placeautocomplete{display:block;width:100%}
+  gmp-placeautocomplete::part(input){padding:6px 9px;border:1px solid var(--border-md);border-radius:var(--radius-sm);font-size:13px;font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);width:100%;box-sizing:border-box}
 </style>
 </head>
 <body>
@@ -534,26 +531,23 @@ async function attachAutocomplete(tries){
   }
   input.dataset.acDone='1';
   try{
-    const{Autocomplete}=await google.maps.importLibrary('places');
-    const ac=new Autocomplete(input,{
-      types:['address'],
-      componentRestrictions:{country:'us'},
-      fields:['address_components','formatted_address']
-    });
-    ac.addListener('place_changed',async()=>{
-      const place=ac.getPlace();
-      if(!place.address_components)return;
+    const{PlaceAutocompleteElement}=await google.maps.importLibrary('places');
+    const pac=new PlaceAutocompleteElement({types:['address'],includedRegionCodes:['us']});
+    input.parentNode.insertBefore(pac,input);
+    input.style.display='none';
+    pac.addEventListener('gmp-placeselect',async({place})=>{
       try{
+        await place.fetchFields({fields:['addressComponents','formattedAddress']});
         let num='',street='',city='',state='',zip='';
-        for(const c of place.address_components){
+        for(const c of place.addressComponents||[]){
           const t=c.types||[];
-          if(t.includes('street_number'))num=c.long_name||'';
-          if(t.includes('route'))street=c.long_name||'';
-          if(t.includes('locality'))city=c.long_name||'';
-          if(t.includes('administrative_area_level_1'))state=c.short_name||'';
-          if(t.includes('postal_code'))zip=c.long_name||'';
+          if(t.includes('street_number'))num=c.longText||'';
+          if(t.includes('route'))street=c.longText||'';
+          if(t.includes('locality'))city=c.longText||'';
+          if(t.includes('administrative_area_level_1'))state=c.shortText||'';
+          if(t.includes('postal_code'))zip=c.longText||'';
         }
-        input.value=(num+' '+street).trim()||(place.formatted_address||'');
+        input.value=(num+' '+street).trim()||(place.formattedAddress||'');
         const cityEl=document.getElementById('m_city');
         const zipEl=document.getElementById('m_zip');
         if(cityEl)cityEl.value=city+(state?', '+state:'');
@@ -562,7 +556,7 @@ async function attachAutocomplete(tries){
         const saveBtn=document.querySelector('#add_modal .action-btn.primary');
         if(saveBtn){saveBtn.textContent='Fetching property data...';saveBtn.disabled=true;}
 
-        const fullAddr=(place.formatted_address||'').replace(/,\s*USA$/,'');
+        const fullAddr=(place.formattedAddress||'').replace(/,\s*USA$/,'');
         const data=await fetchPropertyData(fullAddr);
         if(data){
           const set=(id,v)=>{if(v!=null&&v!==''){const el=document.getElementById(id);if(el)el.value=v;}};
