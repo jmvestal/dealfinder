@@ -531,17 +531,22 @@ async function attachAutocomplete(tries){
   }
   input.dataset.acDone='1';
   try{
-    const{PlaceAutocompleteElement}=await google.maps.importLibrary('places');
-    const pac=new PlaceAutocompleteElement({types:['address'],includedRegionCodes:['us']});
-    input.parentNode.insertBefore(pac,input);
-    input.style.display='none';
+    const{AutocompleteSuggestion}=await google.maps.importLibrary('places');
+
+    // Dropdown appended to body (position:fixed) to avoid modal overflow clipping
+    const dd=document.createElement('ul');
+    dd.style.cssText='position:fixed;z-index:99999;background:#fff;border:1px solid #d1d5db;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.18);margin:0;padding:0;list-style:none;display:none;max-height:240px;overflow-y:auto;';
+    document.body.appendChild(dd);
+
+    function posDD(){const r=input.getBoundingClientRect();dd.style.top=(r.bottom+2)+'px';dd.style.left=r.left+'px';dd.style.width=r.width+'px';}
+    function hideDD(){dd.style.display='none';dd.innerHTML='';}
 
     async function handleSelection(addrText){
       if(!addrText)return;
+      hideDD();
       const saveBtn=document.querySelector('#add_modal .action-btn.primary');
       let num='',street='',city='',state='',zip='',formatted=addrText;
 
-      // Try Geocoder for structured components
       try{
         const geocoder=new google.maps.Geocoder();
         const res=await geocoder.geocode({address:addrText});
@@ -557,23 +562,20 @@ async function attachAutocomplete(tries){
             if(t.includes('postal_code'))zip=c.long_name||'';
           }
         }
-      }catch(ge){console.warn('Geocoder:',ge.message||ge);}
+      }catch(ge){console.warn('Geocoder:',ge);}
 
-      // Always fall back to text parsing if geocoder didn't fill city
       if(!city){
         const parts=addrText.replace(/,\s*USA$/i,'').split(',').map(s=>s.trim());
         if(parts.length>=2)city=parts[1]||'';
         if(parts.length>=3){const sz=parts[2].trim().split(/\s+/);state=sz[0]||'';zip=sz[1]||'';}
       }
 
-      // Always fill the form fields
       input.value=(num&&street?(num+' '+street).trim():'')||addrText.split(',')[0].trim();
       const cityEl=document.getElementById('m_city');
       const zipEl=document.getElementById('m_zip');
       if(cityEl)cityEl.value=city+(state?', '+state:'');
       if(zipEl)zipEl.value=zip;
 
-      // Rentcast enrichment
       try{
         if(saveBtn){saveBtn.textContent='Fetching property data...';saveBtn.disabled=true;}
         const data=await fetchPropertyData(formatted.replace(/,\s*USA$/i,''));
@@ -594,22 +596,38 @@ async function attachAutocomplete(tries){
       if(saveBtn){saveBtn.textContent='Save & analyze';saveBtn.disabled=false;}
     }
 
-    // Primary: poll pac.value — fires reliably when user picks a suggestion
-    let lastVal='';
-    const poller=setInterval(async()=>{
-      const v=pac.value||'';
-      if(v&&v!==lastVal){lastVal=v;await handleSelection(v);}
-    },300);
-
-    // Also handle via event in case it fires
-    pac.addEventListener('gmp-placeselect',async()=>{
-      await new Promise(r=>setTimeout(r,100));
-      const v=pac.value||'';
-      if(v&&v!==lastVal){lastVal=v;await handleSelection(v);}
+    let timer;
+    input.addEventListener('input',()=>{
+      clearTimeout(timer);
+      const q=input.value.trim();
+      if(q.length<3){hideDD();return;}
+      timer=setTimeout(async()=>{
+        try{
+          const{suggestions}=await AutocompleteSuggestion.fetchAutocompleteSuggestions({input:q,includedRegionCodes:['us']});
+          dd.innerHTML='';
+          if(!suggestions||!suggestions.length){hideDD();return;}
+          suggestions.slice(0,5).forEach(s=>{
+            const text=s.placePrediction.text.toString();
+            const li=document.createElement('li');
+            li.style.cssText='padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f3f4f6;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+            li.textContent=text;
+            li.addEventListener('mouseover',()=>li.style.background='#f0f4ff');
+            li.addEventListener('mouseout',()=>li.style.background='');
+            li.addEventListener('mousedown',async(e)=>{e.preventDefault();input.value=text;await handleSelection(text);});
+            dd.appendChild(li);
+          });
+          posDD();
+          dd.style.display='block';
+        }catch(err){console.warn('Suggestions:',err);hideDD();}
+      },300);
     });
+
+    input.addEventListener('blur',()=>setTimeout(hideDD,150));
+    input.addEventListener('keydown',(e)=>{if(e.key==='Escape')hideDD();});
+
   }catch(e){
     input.dataset.acDone='';
-    console.warn('Places failed to load:',e);
+    console.warn('Places failed:',e);
   }
 }
 
