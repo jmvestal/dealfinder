@@ -532,12 +532,14 @@ async function attachAutocomplete(tries){
   input.dataset.acDone='1';
   try{
     const{PlaceAutocompleteElement}=await google.maps.importLibrary('places');
-    const pac=new PlaceAutocompleteElement({types:['address'],includedRegionCodes:['us']});
+    const pac=new PlaceAutocompleteElement({types:['address'],includedRegionCodes:['us'],requestedFields:['addressComponents','formattedAddress']});
     input.parentNode.insertBefore(pac,input);
     input.style.display='none';
     pac.addEventListener('gmp-placeselect',async({place})=>{
       try{
-        await place.fetchFields({fields:['addressComponents','formattedAddress']});
+        if(!place.addressComponents){
+          await place.fetchFields({fields:['addressComponents','formattedAddress']});
+        }
         let num='',street='',city='',state='',zip='';
         for(const c of place.addressComponents||[]){
           const t=c.types||[];
@@ -547,7 +549,7 @@ async function attachAutocomplete(tries){
           if(t.includes('administrative_area_level_1'))state=c.shortText||'';
           if(t.includes('postal_code'))zip=c.longText||'';
         }
-        input.value=(num+' '+street).trim()||(place.formattedAddress||'');
+        input.value=(num+' '+street).trim()||(place.formattedAddress||'').split(',')[0].trim();
         const cityEl=document.getElementById('m_city');
         const zipEl=document.getElementById('m_zip');
         if(cityEl)cityEl.value=city+(state?', '+state:'');
