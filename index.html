@@ -536,6 +536,9 @@ async function attachAutocomplete(tries){
     input.parentNode.insertBefore(pac,input);
     input.style.display='none';
     console.error('[DF] PAC element created, listening for gmp-placeselect');
+    ['gmp-placeselect','gmp-select','placeselect','place_changed','change','input','click'].forEach(evt=>{
+      pac.addEventListener(evt,e=>console.error('[DF] event fired:',evt,e.place||e.detail||''));
+    });
     pac.addEventListener('gmp-placeselect',async({place})=>{
       console.error('[DF] place selected id=',place.id,'displayName=',place.displayName);
       try{
