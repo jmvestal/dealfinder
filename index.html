@@ -290,7 +290,7 @@ const STATE_MEDIAN_PRICE={'AL':195000,'AK':315000,'AZ':415000,'AR':180000,'CA':7
 const STATE_MEDIAN_RENT={'AL':950,'AK':1200,'AZ':1500,'AR':860,'CA':2500,'CO':1800,'CT':1600,'DE':1300,'FL':1800,'GA':1300,'HI':2300,'ID':1300,'IL':1200,'IN':960,'IA':910,'KS':960,'KY':960,'LA':1010,'ME':1200,'MD':1700,'MA':2200,'MI':1010,'MN':1300,'MS':860,'MO':1010,'MT':1200,'NE':1010,'NV':1500,'NH':1500,'NJ':1900,'NM':1100,'NY':2000,'NC':1300,'ND':960,'OH':1010,'OK':960,'OR':1600,'PA':1200,'RI':1500,'SC':1200,'SD':960,'TN':1300,'TX':1500,'UT':1600,'VT':1200,'VA':1700,'WA':2200,'WV':760,'WI':1010,'WY':1010,'DC':2400};
 
 function estInsurance(value,type,yearBuilt){
-  let rate=0.006;
+  let rate=0.0085;
   const age=new Date().getFullYear()-(yearBuilt||1990);
   if(age>30)rate+=0.001;
   if(age>50)rate+=0.001;
@@ -310,17 +310,20 @@ async function fetchPropertyData(address){
   const h={'X-Api-Key':RENTCAST_KEY};
   const a=encodeURIComponent(address);
   try{
-    const[pr,rr]=await Promise.all([
+    const[pr,rr,vr]=await Promise.all([
       fetch(`https://api.rentcast.io/v1/properties?address=${a}&limit=1`,{headers:h}),
-      fetch(`https://api.rentcast.io/v1/avm/rent/long-term?address=${a}`,{headers:h})
+      fetch(`https://api.rentcast.io/v1/avm/rent/long-term?address=${a}`,{headers:h}),
+      fetch(`https://api.rentcast.io/v1/avm/value?address=${a}`,{headers:h})
     ]);
     const pd=pr.ok?await pr.json():null;
     const rd=rr.ok?await rr.json():null;
+    const vd=vr.ok?await vr.json():null;
     const p=Array.isArray(pd)&&pd.length?pd[0]:null;
     const taxes=p?.propertyTaxes;
     const lastTaxYear=taxes?Math.max(...Object.keys(taxes).map(Number)):null;
     const actualTax=lastTaxYear?taxes[String(lastTaxYear)]?.total:null;
-    return{beds:p?.bedrooms,baths:p?.bathrooms,sqft:p?.squareFootage,yearBuilt:p?.yearBuilt,propType:p?.propertyType,price:p?.lastSalePrice,rent:rd?.rent,actualTax};
+    const price=vd?.price||p?.lastSalePrice||null;
+    return{beds:p?.bedrooms,baths:p?.bathrooms,sqft:p?.squareFootage,yearBuilt:p?.yearBuilt,propType:p?.propertyType,price,rent:rd?.rent,actualTax};
   }catch(e){console.warn('RentCast error:',e);return null;}
 }
 function mort(p,ar,y){const r=ar/100/12,n=y*12;if(r===0)return p/n;return p*(r*Math.pow(1+r,n))/(Math.pow(1+r,n)-1);}
