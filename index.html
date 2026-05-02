@@ -535,6 +535,7 @@ async function attachAutocomplete(tries){
     const pac=new PlaceAutocompleteElement({types:['address'],includedRegionCodes:['us']});
     input.parentNode.insertBefore(pac,input);
     input.style.display='none';
+    console.error('[DF] PAC element created, listening for gmp-placeselect');
     pac.addEventListener('gmp-placeselect',async({place})=>{
       console.error('[DF] place selected id=',place.id,'displayName=',place.displayName);
       try{
@@ -621,6 +622,7 @@ function loadGoogleMaps(){
 }
 
 loadGoogleMaps();
+console.error('[DF] script loaded');
 renderListings();
 </script>
 </body>
