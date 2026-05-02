@@ -317,7 +317,10 @@ async function fetchPropertyData(address){
     const pd=pr.ok?await pr.json():null;
     const rd=rr.ok?await rr.json():null;
     const p=Array.isArray(pd)&&pd.length?pd[0]:null;
-    return{beds:p?.bedrooms,baths:p?.bathrooms,sqft:p?.squareFootage,yearBuilt:p?.yearBuilt,propType:p?.propertyType,price:p?.lastSalePrice,rent:rd?.rent};
+    const taxes=p?.propertyTaxes;
+    const lastTaxYear=taxes?Math.max(...Object.keys(taxes).map(Number)):null;
+    const actualTax=lastTaxYear?taxes[String(lastTaxYear)]?.total:null;
+    return{beds:p?.bedrooms,baths:p?.bathrooms,sqft:p?.squareFootage,yearBuilt:p?.yearBuilt,propType:p?.propertyType,price:p?.lastSalePrice,rent:rd?.rent,actualTax};
   }catch(e){console.warn('RentCast error:',e);return null;}
 }
 function mort(p,ar,y){const r=ar/100/12,n=y*12;if(r===0)return p/n;return p*(r*Math.pow(1+r,n))/(Math.pow(1+r,n)-1);}
@@ -614,7 +617,7 @@ async function attachAutocomplete(tries){
           if(data.rent)set('m_rent',Math.round(data.rent));
           if(data.price){
             set('m_price',Math.round(data.price));
-            set('m_tax',Math.round(data.price*(STATE_TAX[state]||0.01)));
+            set('m_tax',data.actualTax?Math.round(data.actualTax):Math.round(data.price*(STATE_TAX[state]||0.01)));
             set('m_ins',estInsurance(data.price,type,data.yearBuilt));
           }
           const typeEl=document.getElementById('m_type');
