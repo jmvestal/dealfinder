@@ -40,6 +40,8 @@
   .prop-card.active{background:#eef4fc;border-left:3px solid var(--accent)}
   .prop-thumb{width:100%;height:88px;border-radius:var(--radius-sm);margin-bottom:8px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-3);font-family:'DM Mono',monospace;overflow:hidden;position:relative}
   .prop-thumb-grid{position:absolute;inset:0;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:2px;padding:2px}
+  .prop-thumb-sv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;}
+  .hero-sv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;}
   .thumb-cell{border-radius:3px}
   .badge-type{position:absolute;top:6px;left:6px;font-size:10px;font-weight:600;padding:2px 6px;border-radius:4px;background:rgba(0,0,0,0.55);color:#fff;font-family:'DM Mono',monospace;letter-spacing:.04em}
   .prop-addr{font-size:13px;font-weight:500;margin-bottom:1px}
@@ -365,7 +367,7 @@ function getFiltered(){
   return list;
 }
 
-function thumbSVG(p){const c=COLORS[p.colorIdx%COLORS.length];return`<div class="prop-thumb"><div class="prop-thumb-grid"><div class="thumb-cell" style="background:${c[0]}"></div><div class="thumb-cell" style="background:${c[1]};grid-row:1/3"></div><div class="thumb-cell" style="background:${c[2]}"></div></div><div class="badge-type">${p.type==='multi'?'MULTI':p.type==='str'?'STR':p.type==='flip'?'FLIP':'SFR'}</div></div>`;}
+function thumbSVG(p){const c=COLORS[p.colorIdx%COLORS.length];const loc=encodeURIComponent((p.addr||'')+', '+(p.city||''));const key='AIzaSyBv9d9qF-RERlNWeIihuFCKFr1yH0gfI2g';return`<div class="prop-thumb"><img class="prop-thumb-sv" src="https://maps.googleapis.com/maps/api/streetview?size=280x180&location=${loc}&return_error_code=true&key=${key}" onerror="this.style.display='none';this.nextElementSibling.style.display='grid'"><div class="prop-thumb-grid" style="display:none"><div class="thumb-cell" style="background:${c[0]}"></div><div class="thumb-cell" style="background:${c[1]};grid-row:1/3"></div><div class="thumb-cell" style="background:${c[2]}"></div></div><div class="badge-type">${p.type==='multi'?'MULTI':p.type==='str'?'STR':p.type==='flip'?'FLIP':'SFR'}</div></div>`;}
 
 function renderListings(){
   const list=getFiltered();
@@ -388,7 +390,8 @@ function renderDetail(id){
   const isFlip=p.type==='flip';
   const c=COLORS[p.colorIdx%COLORS.length];
 
-  const heroHtml=`<div class="detail-hero"><div class="hero-grid"><div class="hero-cell" style="background:${c[0]};grid-row:1/3"></div><div class="hero-cell" style="background:${c[1]}"></div><div class="hero-cell" style="background:${c[2]}"></div></div><div class="hero-overlay"></div><div class="hero-info"><div class="hero-addr">${p.addr}</div><div class="hero-city">${p.city} · ${p.beds}bd/${p.baths}ba · ${p.sqft.toLocaleString()} sqft · Built ${p.yearBuilt}</div></div></div>`;
+  const svLoc=encodeURIComponent((p.addr||'')+', '+(p.city||''));const svKey='AIzaSyBv9d9qF-RERlNWeIihuFCKFr1yH0gfI2g';
+  const heroHtml=`<div class="detail-hero"><img class="hero-sv" src="https://maps.googleapis.com/maps/api/streetview?size=800x300&location=${svLoc}&return_error_code=true&key=${svKey}" onerror="this.style.display='none'"><div class="hero-grid"><div class="hero-cell" style="background:${c[0]};grid-row:1/3"></div><div class="hero-cell" style="background:${c[1]}"></div><div class="hero-cell" style="background:${c[2]}"></div></div><div class="hero-overlay"></div><div class="hero-info"><div class="hero-addr">${p.addr}</div><div class="hero-city">${p.city} · ${p.beds}bd/${p.baths}ba · ${p.sqft.toLocaleString()} sqft · Built ${p.yearBuilt}</div></div></div>`;
 
   const scoreBanner=`<div class="score-banner"><div class="score-circle" style="border-color:${sc.color}"><div class="score-num" style="color:${sc.color}">${sc.score}</div><div class="score-lbl">score</div></div><div class="score-info"><div class="score-title"><span class="deal-grade grade-${sc.grade}" style="margin-right:8px">${sc.grade}-grade deal</span>${p.type==='multi'?'Multi-family':p.type==='str'?'Short-term rental':p.type==='flip'?'Fix & flip':'Single-family rental'}</div><div class="score-desc">${p.desc}</div></div><div class="price-big">${fmt(p.price)}</div></div>`;
 
