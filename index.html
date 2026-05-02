@@ -286,6 +286,8 @@ function saveToStorage(){try{localStorage.setItem('df_props',JSON.stringify(PROP
 
 const RENTCAST_KEY='eba3b98edf334545a12234f1ba2824b5';
 const STATE_TAX={'AL':0.0041,'AK':0.0119,'AZ':0.0062,'AR':0.0061,'CA':0.0076,'CO':0.0051,'CT':0.0214,'DE':0.0057,'FL':0.0089,'GA':0.0092,'HI':0.0028,'ID':0.0069,'IL':0.0227,'IN':0.0085,'IA':0.0153,'KS':0.0137,'KY':0.0086,'LA':0.0055,'ME':0.0136,'MD':0.0112,'MA':0.0117,'MI':0.0154,'MN':0.0112,'MS':0.0065,'MO':0.0097,'MT':0.0083,'NE':0.0153,'NV':0.0060,'NH':0.0218,'NJ':0.0249,'NM':0.0079,'NY':0.0172,'NC':0.0077,'ND':0.0099,'OH':0.0153,'OK':0.0090,'OR':0.0097,'PA':0.0153,'RI':0.0153,'SC':0.0057,'SD':0.0117,'TN':0.0071,'TX':0.0180,'UT':0.0058,'VT':0.0191,'VA':0.0082,'WA':0.0093,'WV':0.0059,'WI':0.0185,'WY':0.0061,'DC':0.0085};
+const STATE_MEDIAN_PRICE={'AL':195000,'AK':315000,'AZ':415000,'AR':180000,'CA':760000,'CO':545000,'CT':385000,'DE':325000,'FL':410000,'GA':335000,'HI':850000,'ID':405000,'IL':290000,'IN':235000,'IA':205000,'KS':215000,'KY':225000,'LA':215000,'ME':355000,'MD':425000,'MA':590000,'MI':255000,'MN':335000,'MS':180000,'MO':235000,'MT':415000,'NE':245000,'NV':425000,'NH':445000,'NJ':495000,'NM':285000,'NY':455000,'NC':325000,'ND':255000,'OH':225000,'OK':195000,'OR':475000,'PA':285000,'RI':425000,'SC':305000,'SD':275000,'TN':315000,'TX':325000,'UT':505000,'VT':365000,'VA':425000,'WA':565000,'WV':165000,'WI':275000,'WY':325000,'DC':650000};
+const STATE_MEDIAN_RENT={'AL':950,'AK':1200,'AZ':1500,'AR':860,'CA':2500,'CO':1800,'CT':1600,'DE':1300,'FL':1800,'GA':1300,'HI':2300,'ID':1300,'IL':1200,'IN':960,'IA':910,'KS':960,'KY':960,'LA':1010,'ME':1200,'MD':1700,'MA':2200,'MI':1010,'MN':1300,'MS':860,'MO':1010,'MT':1200,'NE':1010,'NV':1500,'NH':1500,'NJ':1900,'NM':1100,'NY':2000,'NC':1300,'ND':960,'OH':1010,'OK':960,'OR':1600,'PA':1200,'RI':1500,'SC':1200,'SD':960,'TN':1300,'TX':1500,'UT':1600,'VT':1200,'VA':1700,'WA':2200,'WV':760,'WI':1010,'WY':1010,'DC':2400};
 
 function estInsurance(value,type,yearBuilt){
   let rate=0.006;
@@ -599,11 +601,14 @@ async function attachAutocomplete(tries){
       if(cityEl)cityEl.value=city+(state?', '+state:'');
       if(zipEl)zipEl.value=zip;
 
+      if(saveBtn){saveBtn.textContent='Fetching property data...';saveBtn.disabled=true;}
+      const set=(id,v)=>{if(v!=null&&v!==''){const el=document.getElementById(id);if(el)el.value=v;}};
+      let gotPropData=false;
+
+      // Try Rentcast first (paid — fills real beds/baths/price/rent)
       try{
-        if(saveBtn){saveBtn.textContent='Fetching property data...';saveBtn.disabled=true;}
         const data=await fetchPropertyData(formatted.replace(/,\s*USA$/i,''));
-        if(data){
-          const set=(id,v)=>{if(v!=null&&v!==''){const el=document.getElementById(id);if(el)el.value=v;}};
+        if(data&&(data.beds||data.price)){
           const type=mapType(data.propType);
           set('m_beds',data.beds);set('m_baths',data.baths);set('m_sqft',data.sqft);set('m_year',data.yearBuilt);
           if(data.rent)set('m_rent',Math.round(data.rent));
@@ -614,8 +619,49 @@ async function attachAutocomplete(tries){
           }
           const typeEl=document.getElementById('m_type');
           if(typeEl&&type)typeEl.value=type;
+          gotPropData=true;
         }
       }catch(re){console.warn('Rentcast:',re);}
+
+      // Fallback: Census ACS area medians (free, no key needed)
+      if(!gotPropData&&zip){
+        try{
+          const acsRes=await fetch(`https://api.census.gov/data/2023/acs/acs5?get=B25077_001E,B25031_001E&for=zip%20code%20tabulation%20area:${zip}&key=DEMO_KEY`);
+          if(acsRes.ok){
+            const acsData=await acsRes.json();
+            if(acsData&&acsData.length>=2){
+              const medVal=parseInt(acsData[1][0]);
+              const medRent=parseInt(acsData[1][1]);
+              const typeVal=document.getElementById('m_type')?.value||'sfr';
+              if(medVal>0){
+                set('m_price',medVal);
+                set('m_tax',Math.round(medVal*(STATE_TAX[state]||0.01)));
+                set('m_ins',estInsurance(medVal,typeVal,1985));
+                set('m_maint',Math.round(medVal*0.01));
+              }
+              if(medRent>0)set('m_rent',medRent);
+            }
+          }
+        }catch(ae){console.warn('Census ACS:',ae);}
+      }
+
+      // Last resort: state-level medians + type defaults (always available, no API needed)
+      if(!gotPropData&&state&&!document.getElementById('m_price')?.value){
+        const medPrice=STATE_MEDIAN_PRICE[state];
+        const medRent=STATE_MEDIAN_RENT[state];
+        const typeVal=document.getElementById('m_type')?.value||'sfr';
+        if(medPrice){
+          set('m_price',medPrice);
+          set('m_tax',Math.round(medPrice*(STATE_TAX[state]||0.01)));
+          set('m_ins',estInsurance(medPrice,typeVal,1985));
+          set('m_maint',Math.round(medPrice*0.01));
+        }
+        if(medRent)set('m_rent',medRent);
+        const typeDefaults={sfr:{beds:3,baths:2,sqft:1400,year:1985},multi:{beds:6,baths:4,sqft:2800,year:1975},str:{beds:3,baths:2,sqft:1200,year:1990},flip:{beds:3,baths:1,sqft:1100,year:1965}};
+        const td=typeDefaults[typeVal]||typeDefaults.sfr;
+        set('m_beds',td.beds);set('m_baths',td.baths);set('m_sqft',td.sqft);set('m_year',td.year);
+      }
+
       if(saveBtn){saveBtn.textContent='Save & analyze';saveBtn.disabled=false;}
     }
 
