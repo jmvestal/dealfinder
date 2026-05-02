@@ -537,26 +537,57 @@ async function attachAutocomplete(tries){
     input.style.display='none';
     pac.addEventListener('gmp-placeselect',async({place})=>{
       try{
-        try{await place.fetchFields({fields:['addressComponents','formattedAddress']});}catch(fe){console.warn('fetchFields:',fe);}
-        // pac.value updates after the event fires — wait a tick so it reflects the selected address
-        await new Promise(r=>setTimeout(r,80));
-        let num='',street='',city='',state='',zip='';
-        for(const c of place.addressComponents||[]){
-          const t=c.types||[];
-          if(t.includes('street_number'))num=c.longText||'';
-          if(t.includes('route'))street=c.longText||'';
-          if(t.includes('locality'))city=c.longText||'';
-          if(t.includes('administrative_area_level_1'))state=c.shortText||'';
-          if(t.includes('postal_code'))zip=c.longText||'';
+        let num='',street='',city='',state='',zip='',formattedAddr='';
+
+        // Strategy 1: fetchFields (Places API New)
+        try{
+          await place.fetchFields({fields:['addressComponents','formattedAddress']});
+          for(const c of place.addressComponents||[]){
+            const t=c.types||[];
+            if(t.includes('street_number'))num=c.longText||'';
+            if(t.includes('route'))street=c.longText||'';
+            if(t.includes('locality'))city=c.longText||'';
+            if(t.includes('administrative_area_level_1'))state=c.shortText||'';
+            if(t.includes('postal_code'))zip=c.longText||'';
+          }
+          formattedAddr=place.formattedAddress||'';
+        }catch(fe){console.warn('fetchFields failed, trying Geocoder:',fe.message||fe);}
+
+        // Strategy 2: Geocoder (built into Maps JS API)
+        if(!city&&place.id){
+          try{
+            const geocoder=new google.maps.Geocoder();
+            const res=await geocoder.geocode({placeId:place.id});
+            const r=res.results&&res.results[0];
+            if(r){
+              formattedAddr=r.formatted_address||'';
+              for(const c of r.address_components||[]){
+                const t=c.types||[];
+                if(t.includes('street_number'))num=c.long_name||'';
+                if(t.includes('route'))street=c.long_name||'';
+                if(t.includes('locality'))city=c.long_name||'';
+                if(t.includes('administrative_area_level_1'))state=c.short_name||'';
+                if(t.includes('postal_code'))zip=c.long_name||'';
+              }
+            }
+          }catch(ge){console.warn('Geocoder failed:',ge.message||ge);}
         }
-        // fallback: parse the full address text shown in the autocomplete input
-        const fullText=(place.formattedAddress||pac.value||'').replace(/,\s*USA$/i,'');
-        if(!city&&fullText){
-          const parts=fullText.split(',').map(s=>s.trim());
-          if(parts.length>=2)city=parts[1]||'';
-          if(parts.length>=3){const sz=(parts[2]||'').trim().split(/\s+/);state=sz[0]||'';if(!zip)zip=sz[1]||'';}
+
+        // Strategy 3: parse the text displayed in the autocomplete component
+        if(!city){
+          await new Promise(r=>setTimeout(r,100));
+          const raw=(pac.shadowRoot&&pac.shadowRoot.querySelector('input')?.value)||pac.value||'';
+          const txt=raw.replace(/,\s*USA$/i,'');
+          if(txt){
+            const parts=txt.split(',').map(s=>s.trim());
+            if(!num&&!street)num=parts[0]||'';
+            if(parts.length>=2)city=parts[1]||'';
+            if(parts.length>=3){const sz=parts[2].trim().split(/\s+/);state=sz[0]||'';zip=sz[1]||'';}
+            if(!formattedAddr)formattedAddr=txt;
+          }
         }
-        input.value=(num+' '+street).trim()||fullText.split(',')[0].trim();
+
+        input.value=(num&&street?(num+' '+street).trim():num||street)||formattedAddr.split(',')[0].trim();
         const cityEl=document.getElementById('m_city');
         const zipEl=document.getElementById('m_zip');
         if(cityEl)cityEl.value=city+(state?', '+state:'');
@@ -565,15 +596,12 @@ async function attachAutocomplete(tries){
         const saveBtn=document.querySelector('#add_modal .action-btn.primary');
         if(saveBtn){saveBtn.textContent='Fetching property data...';saveBtn.disabled=true;}
 
-        const fullAddr=(place.formattedAddress||pac.value||'').replace(/,\s*USA$/i,'');
+        const fullAddr=formattedAddr.replace(/,\s*USA$/i,'')||input.value;
         const data=await fetchPropertyData(fullAddr);
         if(data){
           const set=(id,v)=>{if(v!=null&&v!==''){const el=document.getElementById(id);if(el)el.value=v;}};
           const type=mapType(data.propType);
-          set('m_beds',data.beds);
-          set('m_baths',data.baths);
-          set('m_sqft',data.sqft);
-          set('m_year',data.yearBuilt);
+          set('m_beds',data.beds);set('m_baths',data.baths);set('m_sqft',data.sqft);set('m_year',data.yearBuilt);
           if(data.rent)set('m_rent',Math.round(data.rent));
           if(data.price){
             set('m_price',Math.round(data.price));
@@ -585,7 +613,7 @@ async function attachAutocomplete(tries){
         }
         if(saveBtn){saveBtn.textContent='Save & analyze';saveBtn.disabled=false;}
       }catch(e){
-        console.warn('Place detail fetch failed:',e);
+        console.warn('Place selection error:',e);
         const saveBtn=document.querySelector('#add_modal .action-btn.primary');
         if(saveBtn){saveBtn.textContent='Save & analyze';saveBtn.disabled=false;}
       }
