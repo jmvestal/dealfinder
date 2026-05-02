@@ -535,60 +535,38 @@ async function attachAutocomplete(tries){
     const pac=new PlaceAutocompleteElement({types:['address'],includedRegionCodes:['us']});
     input.parentNode.insertBefore(pac,input);
     input.style.display='none';
-    console.error('[DF] PAC element created, listening for gmp-placeselect');
-    ['gmp-placeselect','gmp-select','placeselect','place_changed','change','input','click'].forEach(evt=>{
-      pac.addEventListener(evt,e=>console.error('[DF] event fired:',evt,e.place||e.detail||''));
-    });
-    pac.addEventListener('gmp-placeselect',async({place})=>{
-      console.error('[DF] place selected id=',place.id,'displayName=',place.displayName);
+
+    async function handleSelection(addrText){
+      if(!addrText)return;
+      const saveBtn=document.querySelector('#add_modal .action-btn.primary');
       try{
-        let num='',street='',city='',state='',zip='',formattedAddr='';
-
-        // Strategy 1: fetchFields
-        try{
-          await place.fetchFields({fields:['addressComponents','formattedAddress']});
-          formattedAddr=place.formattedAddress||'';
-          for(const c of place.addressComponents||[]){
+        let num='',street='',city='',state='',zip='',formatted=addrText;
+        const geocoder=new google.maps.Geocoder();
+        const res=await geocoder.geocode({address:addrText});
+        const r=res.results&&res.results[0];
+        if(r){
+          formatted=r.formatted_address||addrText;
+          for(const c of r.address_components||[]){
             const t=c.types||[];
-            if(t.includes('street_number'))num=c.longText||'';
-            if(t.includes('route'))street=c.longText||'';
-            if(t.includes('locality'))city=c.longText||'';
-            if(t.includes('administrative_area_level_1'))state=c.shortText||'';
-            if(t.includes('postal_code'))zip=c.longText||'';
+            if(t.includes('street_number'))num=c.long_name||'';
+            if(t.includes('route'))street=c.long_name||'';
+            if(t.includes('locality'))city=c.long_name||'';
+            if(t.includes('administrative_area_level_1'))state=c.short_name||'';
+            if(t.includes('postal_code'))zip=c.long_name||'';
           }
-          console.error('[DF] fetchFields OK city=',city,'state=',state,'zip=',zip);
-        }catch(fe){console.error('[DF] fetchFields failed:',fe.message||fe);}
-
-        // Strategy 2: direct REST call to Places API (New)
-        if(!city&&place.id){
-          try{
-            const r=await fetch(`https://places.googleapis.com/v1/places/${place.id}?fields=addressComponents,formattedAddress&key=AIzaSyBv9d9qF-RERlNWeIihuFCKFr1yH0gfI2g`);
-            const d=await r.json();
-            console.error('[DF] REST status=',r.status,'body=',JSON.stringify(d).slice(0,300));
-            if(r.ok){
-              formattedAddr=d.formattedAddress||'';
-              for(const c of d.addressComponents||[]){
-                const t=c.types||[];
-                if(t.includes('street_number'))num=c.longText||'';
-                if(t.includes('route'))street=c.longText||'';
-                if(t.includes('locality'))city=c.longText||'';
-                if(t.includes('administrative_area_level_1'))state=c.shortText||'';
-                if(t.includes('postal_code'))zip=c.longText||'';
-              }
-            }
-          }catch(re){console.error('[DF] REST failed:',re.message);}
         }
-
-        console.error('[DF] final city=',city,'state=',state,'zip=',zip,'addr=',formattedAddr);
-        input.value=(num&&street?(num+' '+street).trim():num||street)||formattedAddr.split(',')[0].trim();
+        if(!city){
+          const parts=addrText.replace(/,\s*USA$/i,'').split(',').map(s=>s.trim());
+          if(parts.length>=2)city=parts[1]||'';
+          if(parts.length>=3){const sz=parts[2].trim().split(/\s+/);state=sz[0]||'';zip=sz[1]||'';}
+        }
+        input.value=(num&&street?(num+' '+street).trim():'')||addrText.split(',')[0].trim();
         const cityEl=document.getElementById('m_city');
         const zipEl=document.getElementById('m_zip');
         if(cityEl)cityEl.value=city+(state?', '+state:'');
         if(zipEl)zipEl.value=zip;
-
-        const saveBtn=document.querySelector('#add_modal .action-btn.primary');
         if(saveBtn){saveBtn.textContent='Fetching property data...';saveBtn.disabled=true;}
-        const fullAddr=formattedAddr.replace(/,\s*USA$/i,'')||input.value;
+        const fullAddr=formatted.replace(/,\s*USA$/i,'');
         const data=await fetchPropertyData(fullAddr);
         if(data){
           const set=(id,v)=>{if(v!=null&&v!==''){const el=document.getElementById(id);if(el)el.value=v;}};
@@ -605,10 +583,23 @@ async function attachAutocomplete(tries){
         }
         if(saveBtn){saveBtn.textContent='Save & analyze';saveBtn.disabled=false;}
       }catch(e){
-        console.error('[DF] handler error:',e);
-        const saveBtn=document.querySelector('#add_modal .action-btn.primary');
+        console.warn('handleSelection error:',e);
         if(saveBtn){saveBtn.textContent='Save & analyze';saveBtn.disabled=false;}
       }
+    }
+
+    // Primary: poll pac.value — fires reliably when user picks a suggestion
+    let lastVal='';
+    const poller=setInterval(async()=>{
+      const v=pac.value||'';
+      if(v&&v!==lastVal){lastVal=v;await handleSelection(v);}
+    },300);
+
+    // Also handle via event in case it fires
+    pac.addEventListener('gmp-placeselect',async()=>{
+      await new Promise(r=>setTimeout(r,100));
+      const v=pac.value||'';
+      if(v&&v!==lastVal){lastVal=v;await handleSelection(v);}
     });
   }catch(e){
     input.dataset.acDone='';
