@@ -539,11 +539,13 @@ async function attachAutocomplete(tries){
     async function handleSelection(addrText){
       if(!addrText)return;
       const saveBtn=document.querySelector('#add_modal .action-btn.primary');
+      let num='',street='',city='',state='',zip='',formatted=addrText;
+
+      // Try Geocoder for structured components
       try{
-        let num='',street='',city='',state='',zip='',formatted=addrText;
         const geocoder=new google.maps.Geocoder();
         const res=await geocoder.geocode({address:addrText});
-        const r=res.results&&res.results[0];
+        const r=res&&res.results&&res.results[0];
         if(r){
           formatted=r.formatted_address||addrText;
           for(const c of r.address_components||[]){
@@ -555,19 +557,26 @@ async function attachAutocomplete(tries){
             if(t.includes('postal_code'))zip=c.long_name||'';
           }
         }
-        if(!city){
-          const parts=addrText.replace(/,\s*USA$/i,'').split(',').map(s=>s.trim());
-          if(parts.length>=2)city=parts[1]||'';
-          if(parts.length>=3){const sz=parts[2].trim().split(/\s+/);state=sz[0]||'';zip=sz[1]||'';}
-        }
-        input.value=(num&&street?(num+' '+street).trim():'')||addrText.split(',')[0].trim();
-        const cityEl=document.getElementById('m_city');
-        const zipEl=document.getElementById('m_zip');
-        if(cityEl)cityEl.value=city+(state?', '+state:'');
-        if(zipEl)zipEl.value=zip;
+      }catch(ge){console.warn('Geocoder:',ge.message||ge);}
+
+      // Always fall back to text parsing if geocoder didn't fill city
+      if(!city){
+        const parts=addrText.replace(/,\s*USA$/i,'').split(',').map(s=>s.trim());
+        if(parts.length>=2)city=parts[1]||'';
+        if(parts.length>=3){const sz=parts[2].trim().split(/\s+/);state=sz[0]||'';zip=sz[1]||'';}
+      }
+
+      // Always fill the form fields
+      input.value=(num&&street?(num+' '+street).trim():'')||addrText.split(',')[0].trim();
+      const cityEl=document.getElementById('m_city');
+      const zipEl=document.getElementById('m_zip');
+      if(cityEl)cityEl.value=city+(state?', '+state:'');
+      if(zipEl)zipEl.value=zip;
+
+      // Rentcast enrichment
+      try{
         if(saveBtn){saveBtn.textContent='Fetching property data...';saveBtn.disabled=true;}
-        const fullAddr=formatted.replace(/,\s*USA$/i,'');
-        const data=await fetchPropertyData(fullAddr);
+        const data=await fetchPropertyData(formatted.replace(/,\s*USA$/i,''));
         if(data){
           const set=(id,v)=>{if(v!=null&&v!==''){const el=document.getElementById(id);if(el)el.value=v;}};
           const type=mapType(data.propType);
@@ -581,11 +590,8 @@ async function attachAutocomplete(tries){
           const typeEl=document.getElementById('m_type');
           if(typeEl&&type)typeEl.value=type;
         }
-        if(saveBtn){saveBtn.textContent='Save & analyze';saveBtn.disabled=false;}
-      }catch(e){
-        console.warn('handleSelection error:',e);
-        if(saveBtn){saveBtn.textContent='Save & analyze';saveBtn.disabled=false;}
-      }
+      }catch(re){console.warn('Rentcast:',re);}
+      if(saveBtn){saveBtn.textContent='Save & analyze';saveBtn.disabled=false;}
     }
 
     // Primary: poll pac.value — fires reliably when user picks a suggestion
