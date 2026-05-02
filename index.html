@@ -426,28 +426,22 @@ async function openStreetView(id){
   const p=PROPS.find(x=>x.id===id);if(!p)return;
   const modal=document.createElement('div');
   modal.className='sv-modal';
-  modal.innerHTML=`<div class="sv-modal-bar"><span class="sv-modal-addr">${p.addr}, ${p.city}</span><button class="sv-modal-close" onclick="this.closest('.sv-modal').remove()">×</button></div><div class="sv-pano" id="sv_pano_div"></div>`;
+  modal.innerHTML=`<div class="sv-modal-bar"><span class="sv-modal-addr">${p.addr}, ${p.city}</span><button class="sv-modal-close" onclick="this.closest('.sv-modal').remove()">×</button></div><div id="sv_pano_div" style="position:absolute;inset:0;"></div>`;
   document.body.appendChild(modal);
   try{
-    const[{Geocoder},{StreetViewPanorama}]=await Promise.all([
-      google.maps.importLibrary('geocoding'),
-      google.maps.importLibrary('streetView')
-    ]);
-    const geo=await new Geocoder().geocode({address:p.addr+', '+p.city});
-    if(!geo.results||!geo.results.length)throw new Error('no results');
+    const{StreetViewPanorama}=await google.maps.importLibrary('streetView');
+    const geo=await new google.maps.Geocoder().geocode({address:p.addr+', '+p.city});
+    if(!geo.results?.length)throw new Error('no results');
     new StreetViewPanorama(document.getElementById('sv_pano_div'),{
       position:geo.results[0].geometry.location,
       visible:true,
       addressControl:false,
       fullscreenControl:false,
-      motionTrackingControl:false,
-      linksControl:true,
-      panControl:true,
-      zoomControl:true
+      motionTrackingControl:false
     });
   }catch(e){
     const d=document.getElementById('sv_pano_div');
-    if(d)d.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:#aaa;gap:14px"><div style="font-size:14px">No Street View available</div><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.addr+', '+p.city)}" target="_blank" style="color:#4285f4;font-size:13px;text-decoration:none">Open in Google Maps →</a></div>`;
+    if(d)d.innerHTML=`<div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#aaa;gap:14px"><div style="font-size:14px">No Street View available</div><a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(p.addr+', '+p.city)}" target="_blank" style="color:#4285f4;font-size:13px;text-decoration:none">Open in Google Maps ↗</a></div>`;
   }
 }
 
