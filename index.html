@@ -675,12 +675,13 @@ async function attachAutocomplete(tries){
       // Step 2: Get price from Census zip proxy if Rentcast didn't return one
       let price=rentcastPrice;
       let rent=rentcastRent;
-      if(!price&&zip){
+      if((!price||!rent)&&zip){
         try{
-          const pRes=await fetch(`/api/property?zip=${zip}`);
+          const bedsVal=document.getElementById('m_beds')?.value||'';
+          const pRes=await fetch(`/api/property?zip=${zip}${bedsVal?'&beds='+bedsVal:''}`);
           if(pRes.ok){
             const pData=await pRes.json();
-            if(pData.price)price=pData.price;
+            if(!price&&pData.price)price=pData.price;
             if(!rent&&pData.rent)rent=pData.rent;
           }
         }catch(ae){console.warn('Census proxy:',ae);}
