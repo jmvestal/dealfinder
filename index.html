@@ -606,58 +606,50 @@ async function attachAutocomplete(tries){
 
       if(saveBtn){saveBtn.textContent='Fetching property data...';saveBtn.disabled=true;}
       const set=(id,v)=>{if(v!=null&&v!==''){const el=document.getElementById(id);if(el)el.value=v;}};
-      let gotPropData=false;
 
-      // Try Rentcast first (paid — fills real beds/baths/price/rent)
+      // Step 1: Rentcast — fills real property details + price if available
+      let rentcastPrice=null,rentcastTax=null,rentcastRent=null;
       try{
         const data=await fetchPropertyData(formatted.replace(/,\s*USA$/i,''));
-        if(data&&(data.beds||data.price)){
+        if(data){
           const type=mapType(data.propType);
           set('m_beds',data.beds);set('m_baths',data.baths);set('m_sqft',data.sqft);set('m_year',data.yearBuilt);
-          if(data.rent)set('m_rent',Math.round(data.rent));
-          if(data.price){
-            set('m_price',Math.round(data.price));
-            set('m_tax',data.actualTax?Math.round(data.actualTax):Math.round(data.price*(STATE_TAX[state]||0.01)));
-            set('m_ins',estInsurance(data.price,type,data.yearBuilt));
-          }
+          if(data.rent)rentcastRent=Math.round(data.rent);
+          if(data.price)rentcastPrice=Math.round(data.price);
+          if(data.actualTax)rentcastTax=Math.round(data.actualTax);
           const typeEl=document.getElementById('m_type');
           if(typeEl&&type)typeEl.value=type;
-          gotPropData=true;
         }
       }catch(re){console.warn('Rentcast:',re);}
 
-      // Fallback: zip-level Census ACS via serverless proxy (no CORS issues)
-      if(!gotPropData&&zip){
+      // Step 2: Get price from Census zip proxy if Rentcast didn't return one
+      let price=rentcastPrice;
+      let rent=rentcastRent;
+      if(!price&&zip){
         try{
           const pRes=await fetch(`/api/property?zip=${zip}`);
           if(pRes.ok){
             const pData=await pRes.json();
-            const typeVal=document.getElementById('m_type')?.value||'sfr';
-            if(pData.price){
-              set('m_price',pData.price);
-              set('m_tax',Math.round(pData.price*(STATE_TAX[state]||0.01)));
-              set('m_ins',estInsurance(pData.price,typeVal,1985));
-              set('m_maint',Math.round(pData.price*0.01));
-              gotPropData=true;
-            }
-            if(pData.rent)set('m_rent',pData.rent);
+            if(pData.price)price=pData.price;
+            if(!rent&&pData.rent)rent=pData.rent;
           }
         }catch(ae){console.warn('Census proxy:',ae);}
       }
 
-      // Last resort: state-level medians for price/rent only — no guesses for beds/baths/sqft/year
-      if(!gotPropData&&state&&!document.getElementById('m_price')?.value){
-        const medPrice=STATE_MEDIAN_PRICE[state];
-        const medRent=STATE_MEDIAN_RENT[state];
-        const typeVal=document.getElementById('m_type')?.value||'sfr';
-        if(medPrice){
-          set('m_price',medPrice);
-          set('m_tax',Math.round(medPrice*(STATE_TAX[state]||0.01)));
-          set('m_ins',estInsurance(medPrice,typeVal,1985));
-          set('m_maint',Math.round(medPrice*0.01));
-        }
-        if(medRent)set('m_rent',medRent);
+      // Step 3: State median as final price/rent fallback
+      if(!price&&state)price=STATE_MEDIAN_PRICE[state]||null;
+      if(!rent&&state)rent=STATE_MEDIAN_RENT[state]||null;
+
+      // Fill price, tax, insurance, maintenance, rent from whatever source we have
+      const typeVal=document.getElementById('m_type')?.value||'sfr';
+      const yearVal=parseInt(document.getElementById('m_year')?.value)||1985;
+      if(price){
+        set('m_price',price);
+        set('m_tax',rentcastTax||Math.round(price*(STATE_TAX[state]||0.01)));
+        set('m_ins',estInsurance(price,typeVal,yearVal));
+        set('m_maint',Math.round(price*0.01));
       }
+      if(rent)set('m_rent',rent);
 
       if(saveBtn){saveBtn.textContent='Save & analyze';saveBtn.disabled=false;}
     }
