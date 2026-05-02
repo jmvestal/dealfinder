@@ -130,12 +130,11 @@
   .api-badge{font-size:10px;font-family:'DM Mono',monospace;padding:2px 7px;border-radius:4px}
   .badge-free{background:var(--green-bg);color:var(--green)}
   .badge-paid{background:var(--amber-bg);color:var(--amber)}
-  .pac-container{border-radius:8px;border:1px solid rgba(0,0,0,0.15);box-shadow:0 4px 16px rgba(0,0,0,0.1);font-family:'DM Sans',sans-serif;margin-top:4px;z-index:9999}
-  .pac-item{padding:8px 12px;font-size:13px;cursor:pointer;border-top:1px solid rgba(0,0,0,0.06)}
-  .pac-item:hover{background:#f0efe9}
-  .pac-item-query{font-size:13px;color:#1a1917}
+  .pac-container{z-index:9999!important;font-family:'DM Sans',sans-serif;border:1px solid var(--border-md);border-radius:var(--radius-sm);box-shadow:0 4px 16px rgba(0,0,0,0.12)}
+  .pac-item{padding:6px 10px;font-size:13px;cursor:pointer;color:var(--text)}
+  .pac-item:hover{background:var(--bg)}
+  .pac-item-query{font-size:13px;color:var(--text)}
   .pac-matched{font-weight:600}
-  .pac-icon{display:none}
 </style>
 </head>
 <body>
@@ -287,6 +286,41 @@ let nextId=100,activeFilters=['sfr','multi','str','flip'],activeId=null,activeTa
 try{const s=localStorage.getItem('df_props');if(s){const p=JSON.parse(s);PROPS=[...PROPS,...p];nextId=Math.max(nextId,...p.map(x=>x.id))+1;}}catch(e){}
 
 function saveToStorage(){try{localStorage.setItem('df_props',JSON.stringify(PROPS.filter(p=>p.id>=100)));}catch(e){}}
+
+const RENTCAST_KEY='eba3b98edf334545a12234f1ba2824b5';
+const STATE_TAX={'AL':0.0041,'AK':0.0119,'AZ':0.0062,'AR':0.0061,'CA':0.0076,'CO':0.0051,'CT':0.0214,'DE':0.0057,'FL':0.0089,'GA':0.0092,'HI':0.0028,'ID':0.0069,'IL':0.0227,'IN':0.0085,'IA':0.0153,'KS':0.0137,'KY':0.0086,'LA':0.0055,'ME':0.0136,'MD':0.0112,'MA':0.0117,'MI':0.0154,'MN':0.0112,'MS':0.0065,'MO':0.0097,'MT':0.0083,'NE':0.0153,'NV':0.0060,'NH':0.0218,'NJ':0.0249,'NM':0.0079,'NY':0.0172,'NC':0.0077,'ND':0.0099,'OH':0.0153,'OK':0.0090,'OR':0.0097,'PA':0.0153,'RI':0.0153,'SC':0.0057,'SD':0.0117,'TN':0.0071,'TX':0.0180,'UT':0.0058,'VT':0.0191,'VA':0.0082,'WA':0.0093,'WV':0.0059,'WI':0.0185,'WY':0.0061,'DC':0.0085};
+
+function estInsurance(value,type,yearBuilt){
+  let rate=0.006;
+  const age=new Date().getFullYear()-(yearBuilt||1990);
+  if(age>30)rate+=0.001;
+  if(age>50)rate+=0.001;
+  if(type==='multi')rate+=0.002;
+  if(type==='str')rate+=0.003;
+  return Math.max(800,Math.round(value*rate/100)*100);
+}
+
+function mapType(t){
+  if(!t)return'sfr';
+  const s=t.toLowerCase();
+  if(s.includes('multi')||s.includes('duplex')||s.includes('triplex')||s.includes('quadruplex')||s.includes('apartment'))return'multi';
+  return'sfr';
+}
+
+async function fetchPropertyData(address){
+  const h={'X-Api-Key':RENTCAST_KEY};
+  const a=encodeURIComponent(address);
+  try{
+    const[pr,rr]=await Promise.all([
+      fetch(`https://api.rentcast.io/v1/properties?address=${a}&limit=1`,{headers:h}),
+      fetch(`https://api.rentcast.io/v1/avm/rent/long-term?address=${a}`,{headers:h})
+    ]);
+    const pd=pr.ok?await pr.json():null;
+    const rd=rr.ok?await rr.json():null;
+    const p=Array.isArray(pd)&&pd.length?pd[0]:null;
+    return{beds:p?.bedrooms,baths:p?.bathrooms,sqft:p?.squareFootage,yearBuilt:p?.yearBuilt,propType:p?.propertyType,price:p?.lastSalePrice,rent:rd?.rent};
+  }catch(e){console.warn('RentCast error:',e);return null;}
+}
 function mort(p,ar,y){const r=ar/100/12,n=y*12;if(r===0)return p/n;return p*(r*Math.pow(1+r,n))/(Math.pow(1+r,n)-1);}
 function fmt(n){return '$'+Math.round(n).toLocaleString();}
 function pct(n){return(Math.round(n*10)/10)+'%';}
@@ -490,42 +524,80 @@ function addProperty(){
 
 document.getElementById('add_modal').addEventListener('click',function(e){if(e.target===this)closeModal();});
 
-function attachAutocomplete(tries){
+async function attachAutocomplete(tries){
   tries=tries||0;
   const input=document.getElementById('m_addr');
   if(!input||input.dataset.acDone)return;
-  if(!window.google||!window.google.maps||!window.google.maps.places){
+  if(!window.google||!window.google.maps||!window.google.maps.importLibrary){
     if(tries<20)setTimeout(()=>attachAutocomplete(tries+1),500);
     return;
   }
   input.dataset.acDone='1';
-  const ac=new google.maps.places.Autocomplete(input,{
-    types:['address'],componentRestrictions:{country:'us'},fields:['address_components']
-  });
-  ac.addListener('place_changed',()=>{
-    const place=ac.getPlace();if(!place.address_components)return;
-    let num='',street='',city='',state='',zip='';
-    for(const c of place.address_components){
-      if(c.types.includes('street_number'))num=c.long_name;
-      if(c.types.includes('route'))street=c.long_name;
-      if(c.types.includes('locality'))city=c.long_name;
-      if(c.types.includes('administrative_area_level_1'))state=c.short_name;
-      if(c.types.includes('postal_code'))zip=c.long_name;
-    }
-    input.value=(num+' '+street).trim();
-    const cityEl=document.getElementById('m_city');
-    const zipEl=document.getElementById('m_zip');
-    if(cityEl)cityEl.value=city+(state?', '+state:'');
-    if(zipEl)zipEl.value=zip;
-  });
+  try{
+    const{Autocomplete}=await google.maps.importLibrary('places');
+    const ac=new Autocomplete(input,{
+      types:['address'],
+      componentRestrictions:{country:'us'},
+      fields:['address_components','formatted_address']
+    });
+    ac.addListener('place_changed',async()=>{
+      const place=ac.getPlace();
+      if(!place.address_components)return;
+      try{
+        let num='',street='',city='',state='',zip='';
+        for(const c of place.address_components){
+          const t=c.types||[];
+          if(t.includes('street_number'))num=c.long_name||'';
+          if(t.includes('route'))street=c.long_name||'';
+          if(t.includes('locality'))city=c.long_name||'';
+          if(t.includes('administrative_area_level_1'))state=c.short_name||'';
+          if(t.includes('postal_code'))zip=c.long_name||'';
+        }
+        input.value=(num+' '+street).trim()||(place.formatted_address||'');
+        const cityEl=document.getElementById('m_city');
+        const zipEl=document.getElementById('m_zip');
+        if(cityEl)cityEl.value=city+(state?', '+state:'');
+        if(zipEl)zipEl.value=zip;
+
+        const saveBtn=document.querySelector('#add_modal .action-btn.primary');
+        if(saveBtn){saveBtn.textContent='Fetching property data...';saveBtn.disabled=true;}
+
+        const fullAddr=(place.formatted_address||'').replace(/,\s*USA$/,'');
+        const data=await fetchPropertyData(fullAddr);
+        if(data){
+          const set=(id,v)=>{if(v!=null&&v!==''){const el=document.getElementById(id);if(el)el.value=v;}};
+          const type=mapType(data.propType);
+          set('m_beds',data.beds);
+          set('m_baths',data.baths);
+          set('m_sqft',data.sqft);
+          set('m_year',data.yearBuilt);
+          if(data.rent)set('m_rent',Math.round(data.rent));
+          if(data.price){
+            set('m_price',Math.round(data.price));
+            set('m_tax',Math.round(data.price*(STATE_TAX[state]||0.01)));
+            set('m_ins',estInsurance(data.price,type,data.yearBuilt));
+          }
+          const typeEl=document.getElementById('m_type');
+          if(typeEl&&type)typeEl.value=type;
+        }
+        if(saveBtn){saveBtn.textContent='Save & analyze';saveBtn.disabled=false;}
+      }catch(e){
+        console.warn('Place detail fetch failed:',e);
+        const saveBtn=document.querySelector('#add_modal .action-btn.primary');
+        if(saveBtn){saveBtn.textContent='Save & analyze';saveBtn.disabled=false;}
+      }
+    });
+  }catch(e){
+    input.dataset.acDone='';
+    console.warn('Places failed to load:',e);
+  }
 }
 
 function loadGoogleMaps(){
-  const key=AIzaSyBv9d9qF-RERlNWeIihuFCKFr1yH0gfI2g;
-  if(key===AIzaSyBv9d9qF-RERlNWeIihuFCKFr1yH0gfI2g)return;
+  const key='AIzaSyBv9d9qF-RERlNWeIihuFCKFr1yH0gfI2g';
   const s=document.createElement('script');
-  s.src=`https://maps.googleapis.com/maps/api/js?key=${key}&libraries=places&loading=async`;
-  s.async=true;
+  s.src=`https://maps.googleapis.com/maps/api/js?key=${key}&loading=async`;
+  s.async=true;s.defer=true;
   document.head.appendChild(s);
 }
 
