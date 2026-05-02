@@ -531,7 +531,7 @@ async function attachAutocomplete(tries){
   }
   input.dataset.acDone='1';
   try{
-    const{AutocompleteSuggestion}=await google.maps.importLibrary('places');
+    const{AutocompleteSuggestion,Place}=await google.maps.importLibrary('places');
 
     // Dropdown appended to body (position:fixed) to avoid modal overflow clipping
     const dd=document.createElement('ul');
@@ -541,29 +541,52 @@ async function attachAutocomplete(tries){
     function posDD(){const r=input.getBoundingClientRect();dd.style.top=(r.bottom+2)+'px';dd.style.left=r.left+'px';dd.style.width=r.width+'px';}
     function hideDD(){dd.style.display='none';dd.innerHTML='';}
 
-    async function handleSelection(addrText){
+    async function handleSelection(addrText,placeId){
       if(!addrText)return;
       hideDD();
       const saveBtn=document.querySelector('#add_modal .action-btn.primary');
       let num='',street='',city='',state='',zip='',formatted=addrText;
 
-      try{
-        const geocoder=new google.maps.Geocoder();
-        const res=await geocoder.geocode({address:addrText});
-        const r=res&&res.results&&res.results[0];
-        if(r){
-          formatted=r.formatted_address||addrText;
-          for(const c of r.address_components||[]){
-            const t=c.types||[];
-            if(t.includes('street_number'))num=c.long_name||'';
-            if(t.includes('route'))street=c.long_name||'';
-            if(t.includes('locality'))city=c.long_name||'';
-            if(t.includes('administrative_area_level_1'))state=c.short_name||'';
-            if(t.includes('postal_code'))zip=c.long_name||'';
+      // Try 1: Place.fetchFields via Places API (New) — most reliable, includes zip
+      if(placeId){
+        try{
+          const place=new Place({id:placeId});
+          await place.fetchFields({fields:['addressComponents','formattedAddress']});
+          if(place.addressComponents&&place.addressComponents.length){
+            for(const c of place.addressComponents){
+              const t=c.types||[];
+              if(t.includes('street_number'))num=c.longText||'';
+              if(t.includes('route'))street=c.longText||'';
+              if(t.includes('locality'))city=c.longText||'';
+              if(t.includes('administrative_area_level_1'))state=c.shortText||'';
+              if(t.includes('postal_code'))zip=c.longText||'';
+            }
+            if(place.formattedAddress)formatted=place.formattedAddress;
           }
-        }
-      }catch(ge){console.warn('Geocoder:',ge);}
+        }catch(pe){console.warn('Place fetch:',pe);}
+      }
 
+      // Try 2: Geocoder (if Place fetch didn't fill city or zip)
+      if(!city||!zip){
+        try{
+          const geocoder=new google.maps.Geocoder();
+          const res=await geocoder.geocode({address:addrText});
+          const r=res&&res.results&&res.results[0];
+          if(r){
+            if(!formatted||formatted===addrText)formatted=r.formatted_address||addrText;
+            for(const c of r.address_components||[]){
+              const t=c.types||[];
+              if(!num&&t.includes('street_number'))num=c.long_name||'';
+              if(!street&&t.includes('route'))street=c.long_name||'';
+              if(!city&&t.includes('locality'))city=c.long_name||'';
+              if(!state&&t.includes('administrative_area_level_1'))state=c.short_name||'';
+              if(!zip&&t.includes('postal_code'))zip=c.long_name||'';
+            }
+          }
+        }catch(ge){console.warn('Geocoder:',ge);}
+      }
+
+      // Try 3: Text parsing (final fallback)
       if(!city){
         const parts=addrText.replace(/,\s*USA$/i,'').split(',').map(s=>s.trim());
         if(parts.length>=2)city=parts[1]||'';
@@ -607,13 +630,14 @@ async function attachAutocomplete(tries){
           dd.innerHTML='';
           if(!suggestions||!suggestions.length){hideDD();return;}
           suggestions.slice(0,5).forEach(s=>{
-            const text=s.placePrediction.text.toString();
+            const text=s.placePrediction.text?.text||s.placePrediction.text.toString();
+            const placeId=s.placePrediction.placeId;
             const li=document.createElement('li');
             li.style.cssText='padding:9px 12px;cursor:pointer;font-size:13px;border-bottom:1px solid #f3f4f6;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
             li.textContent=text;
             li.addEventListener('mouseover',()=>li.style.background='#f0f4ff');
             li.addEventListener('mouseout',()=>li.style.background='');
-            li.addEventListener('mousedown',async(e)=>{e.preventDefault();input.value=text;await handleSelection(text);});
+            li.addEventListener('mousedown',async(e)=>{e.preventDefault();input.value=text;await handleSelection(text,placeId);});
             dd.appendChild(li);
           });
           posDD();
