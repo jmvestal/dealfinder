@@ -623,29 +623,26 @@ async function attachAutocomplete(tries){
         }
       }catch(re){console.warn('Rentcast:',re);}
 
-      // Fallback: Census ACS area medians (free, no key needed)
+      // Fallback: zip-level Census ACS via serverless proxy (no CORS issues)
       if(!gotPropData&&zip){
         try{
-          const acsRes=await fetch(`https://api.census.gov/data/2023/acs/acs5?get=B25077_001E,B25031_001E&for=zip%20code%20tabulation%20area:${zip}&key=DEMO_KEY`);
-          if(acsRes.ok){
-            const acsData=await acsRes.json();
-            if(acsData&&acsData.length>=2){
-              const medVal=parseInt(acsData[1][0]);
-              const medRent=parseInt(acsData[1][1]);
-              const typeVal=document.getElementById('m_type')?.value||'sfr';
-              if(medVal>0){
-                set('m_price',medVal);
-                set('m_tax',Math.round(medVal*(STATE_TAX[state]||0.01)));
-                set('m_ins',estInsurance(medVal,typeVal,1985));
-                set('m_maint',Math.round(medVal*0.01));
-              }
-              if(medRent>0)set('m_rent',medRent);
+          const pRes=await fetch(`/api/property?zip=${zip}`);
+          if(pRes.ok){
+            const pData=await pRes.json();
+            const typeVal=document.getElementById('m_type')?.value||'sfr';
+            if(pData.price){
+              set('m_price',pData.price);
+              set('m_tax',Math.round(pData.price*(STATE_TAX[state]||0.01)));
+              set('m_ins',estInsurance(pData.price,typeVal,1985));
+              set('m_maint',Math.round(pData.price*0.01));
+              gotPropData=true;
             }
+            if(pData.rent)set('m_rent',pData.rent);
           }
-        }catch(ae){console.warn('Census ACS:',ae);}
+        }catch(ae){console.warn('Census proxy:',ae);}
       }
 
-      // Last resort: state-level medians + type defaults (always available, no API needed)
+      // Last resort: state-level medians for price/rent only — no guesses for beds/baths/sqft/year
       if(!gotPropData&&state&&!document.getElementById('m_price')?.value){
         const medPrice=STATE_MEDIAN_PRICE[state];
         const medRent=STATE_MEDIAN_RENT[state];
@@ -657,9 +654,6 @@ async function attachAutocomplete(tries){
           set('m_maint',Math.round(medPrice*0.01));
         }
         if(medRent)set('m_rent',medRent);
-        const typeDefaults={sfr:{beds:3,baths:2,sqft:1400,year:1985},multi:{beds:6,baths:4,sqft:2800,year:1975},str:{beds:3,baths:2,sqft:1200,year:1990},flip:{beds:3,baths:1,sqft:1100,year:1965}};
-        const td=typeDefaults[typeVal]||typeDefaults.sfr;
-        set('m_beds',td.beds);set('m_baths',td.baths);set('m_sqft',td.sqft);set('m_year',td.year);
       }
 
       if(saveBtn){saveBtn.textContent='Save & analyze';saveBtn.disabled=false;}
