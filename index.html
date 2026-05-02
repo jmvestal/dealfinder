@@ -429,15 +429,18 @@ async function openStreetView(id){
   modal.innerHTML=`<div class="sv-modal-bar"><span class="sv-modal-addr">${p.addr}, ${p.city}</span><button class="sv-modal-close" onclick="this.closest('.sv-modal').remove()">×</button></div><div id="sv_pano_div" style="position:absolute;inset:0;"></div>`;
   document.body.appendChild(modal);
   try{
-    const{StreetViewPanorama}=await google.maps.importLibrary('streetView');
+    const{StreetViewPanorama,StreetViewService}=await google.maps.importLibrary('streetView');
     const geo=await new google.maps.Geocoder().geocode({address:p.addr+', '+p.city});
-    if(!geo.results?.length)throw new Error('no results');
+    if(!geo.results?.length)throw new Error('no geocode');
+    const loc=geo.results[0].geometry.location;
+    const sv=new StreetViewService();
+    let panoId=null;
+    for(const r of [100,300,600]){
+      try{const res=await sv.getPanorama({location:loc,radius:r});if(res?.data?.location?.pano){panoId=res.data.location.pano;break;}}catch(_){}
+    }
+    if(!panoId)throw new Error('no imagery');
     new StreetViewPanorama(document.getElementById('sv_pano_div'),{
-      position:geo.results[0].geometry.location,
-      visible:true,
-      addressControl:false,
-      fullscreenControl:false,
-      motionTrackingControl:false
+      pano:panoId,visible:true,addressControl:false,fullscreenControl:false,motionTrackingControl:false
     });
   }catch(e){
     const d=document.getElementById('sv_pano_div');
