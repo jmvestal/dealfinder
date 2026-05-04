@@ -58,8 +58,13 @@
   .detail{flex:1;overflow-y:auto;background:var(--bg)}
   .empty-detail{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--text-3);gap:8px}
   .empty-icon{width:48px;height:48px;border:2px dashed var(--border-md);border-radius:50%;display:flex;align-items:center;justify-content:center}
-  .detail-hero{height:180px;position:relative;display:flex;align-items:flex-end;padding:14px;background:var(--surface2);cursor:pointer}
-  .sv-badge{position:absolute;top:10px;right:10px;z-index:3;background:rgba(0,0,0,0.55);color:#fff;font-size:11px;font-weight:600;padding:4px 9px;border-radius:5px;letter-spacing:.03em;pointer-events:none}
+  .detail-hero{height:180px;position:relative;display:flex;align-items:flex-end;padding:14px;background:var(--surface2)}
+  .hero-badges{position:absolute;top:10px;right:10px;z-index:3;display:flex;gap:6px}
+  .sv-badge{background:rgba(0,0,0,0.55);color:#fff;font-size:11px;font-weight:600;padding:4px 9px;border-radius:5px;letter-spacing:.03em;cursor:pointer;user-select:none}
+  .hero-sat{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:0;display:none}
+  .portal-links{display:flex;align-items:center;gap:8px;padding:10px 14px 2px;flex-wrap:wrap}
+  .portal-btn{font-size:11px;font-weight:600;padding:4px 10px;border-radius:5px;background:var(--surface2);color:var(--text-3);text-decoration:none;border:1px solid var(--border-md);white-space:nowrap}
+  .portal-btn:hover{color:var(--text)}
   .sv-modal{position:fixed;inset:0;z-index:99999;background:#000;display:flex;flex-direction:column}
   .sv-modal-bar{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;background:rgba(0,0,0,0.7);position:absolute;top:0;left:0;right:0;z-index:9999}
   .sv-modal-addr{color:#fff;font-size:13px;font-weight:500}
@@ -397,7 +402,8 @@ function renderDetail(id){
   const c=COLORS[p.colorIdx%COLORS.length];
 
   const svLoc=encodeURIComponent((p.addr||'')+', '+(p.city||''));const svKey='AIzaSyBv9d9qF-RERlNWeIihuFCKFr1yH0gfI2g';
-  const heroHtml=`<div class="detail-hero" onclick="openStreetView(${p.id})"><div class="hero-grid"><div class="hero-cell" style="background:${c[0]};grid-row:1/3"></div><div class="hero-cell" style="background:${c[1]}"></div><div class="hero-cell" style="background:${c[2]}"></div></div><img class="hero-sv" src="https://maps.googleapis.com/maps/api/streetview?size=800x300&location=${svLoc}&return_error_code=true&key=${svKey}" onerror="this.style.display='none'"><div class="hero-overlay"></div><div class="sv-badge">&#x1F6B6; Street View</div><div class="hero-info"><div class="hero-addr">${p.addr}</div><div class="hero-city">${p.city} · ${p.beds}bd/${p.baths}ba · ${p.sqft.toLocaleString()} sqft · Built ${p.yearBuilt}</div></div></div>`;
+  const satUrl=`https://maps.googleapis.com/maps/api/staticmap?center=${svLoc}&zoom=18&size=800x300&maptype=satellite&key=${svKey}`;
+  const heroHtml=`<div class="detail-hero"><div class="hero-grid"><div class="hero-cell" style="background:${c[0]};grid-row:1/3"></div><div class="hero-cell" style="background:${c[1]}"></div><div class="hero-cell" style="background:${c[2]}"></div></div><img class="hero-sv" src="https://maps.googleapis.com/maps/api/streetview?size=800x300&location=${svLoc}&return_error_code=true&key=${svKey}" onerror="this.style.display='none'"><img class="hero-sat" src="${satUrl}" onerror="this.style.display='none'"><div class="hero-overlay"></div><div class="hero-badges"><div class="sv-badge" onclick="toggleHeroView(this)">&#x1F6F0; Satellite</div><div class="sv-badge" onclick="openStreetView(${p.id})">&#x1F6B6; Street View</div></div><div class="hero-info"><div class="hero-addr">${p.addr}</div><div class="hero-city">${p.city} · ${p.beds}bd/${p.baths}ba · ${p.sqft.toLocaleString()} sqft · Built ${p.yearBuilt}</div></div></div>`;
 
   const scoreBanner=`<div class="score-banner"><div class="score-circle" style="border-color:${sc.color}"><div class="score-num" style="color:${sc.color}">${sc.score}</div><div class="score-lbl">score</div></div><div class="score-info"><div class="score-title"><span class="deal-grade grade-${sc.grade}" style="margin-right:8px">${sc.grade}-grade deal</span>${p.type==='multi'?'Multi-family':p.type==='str'?'Short-term rental':p.type==='flip'?'Fix & flip':'Single-family rental'}</div><div class="score-desc">${p.desc}</div></div><div class="price-big">${fmt(p.price)}</div></div>`;
 
@@ -418,8 +424,28 @@ function renderDetail(id){
 
   const wl=p.watchlisted;
   const actions=`<div class="action-bar"><button class="action-btn primary" onclick="toggleWatch(${id})" id="watch_btn">${wl?'★ Watchlisted':'☆ Add to watchlist'}</button><button class="action-btn" onclick="removeProp(${id})" ${p.id<100?'style="display:none"':''}>Remove</button></div>`;
+  const zipM=p.city.match(/\d{5}/);const pZip=zipM?zipM[0]:'';
+  const portalLinks=`<div class="portal-links"><span style="font-size:11px;color:var(--text-3)">View on:</span><a href="https://www.zillow.com/homes/${encodeURIComponent(p.addr+', '+p.city)}_rb/" target="_blank" class="portal-btn">Zillow</a><a href="https://www.redfin.com/query/${encodeURIComponent(p.addr+', '+p.city)}" target="_blank" class="portal-btn">Redfin</a><a href="https://www.realtor.com/realestateandhomes-search/${pZip||encodeURIComponent(p.city)}/" target="_blank" class="portal-btn">Realtor.com</a></div>`;
 
-  document.getElementById('detail_panel').innerHTML=heroHtml+`<div class="detail-content">${scoreBanner}${keyMetrics}${calcSection}${actions}</div>`;
+  document.getElementById('detail_panel').innerHTML=heroHtml+`<div class="detail-content">${scoreBanner}${portalLinks}${keyMetrics}${calcSection}${actions}</div>`;
+}
+
+function toggleHeroView(btn){
+  const hero=btn.closest('.detail-hero');
+  const sv=hero.querySelector('.hero-sv');
+  const sat=hero.querySelector('.hero-sat');
+  const isSat=hero.dataset.view==='sat';
+  if(isSat){
+    hero.dataset.view='sv';
+    if(sat)sat.style.display='none';
+    if(sv)sv.style.display='';
+    btn.innerHTML='&#x1F6F0; Satellite';
+  }else{
+    hero.dataset.view='sat';
+    if(sv)sv.style.display='none';
+    if(sat)sat.style.display='block';
+    btn.innerHTML='&#x1F4F7; Street View';
+  }
 }
 
 async function openStreetView(id){
