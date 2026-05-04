@@ -427,9 +427,8 @@ function renderDetail(id){
   const zipM=p.city.match(/\d{5}/);const pZip=zipM?zipM[0]:'';
   const cityM=p.city.match(/^(.*?),\s*([A-Z]{2})/);
   const pCityName=(cityM?cityM[1]:'').trim();const pState=cityM?cityM[2]:'';
-  const addrSlug=p.addr.replace(/[^a-zA-Z0-9]+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,'');
-  const citySlug=pCityName.replace(/\s+/g,'-');
-  const portalLinks=`<div class="portal-links"><span style="font-size:11px;color:var(--text-3)">View on:</span><a href="https://www.zillow.com/homes/${encodeURIComponent(p.addr+', '+p.city)}_rb/" target="_blank" class="portal-btn">Zillow</a><a href="https://www.redfin.com/search#query=${encodeURIComponent(p.addr+', '+p.city)}" target="_blank" class="portal-btn">Redfin</a><a href="https://www.realtor.com/realestateandhomes-detail/${addrSlug}_${citySlug}_${pState}_${pZip}/" target="_blank" class="portal-btn">Realtor.com</a></div>`;
+  const q=encodeURIComponent(p.addr+' '+pCityName+' '+pState+' '+pZip);
+  const portalLinks=`<div class="portal-links"><span style="font-size:11px;color:var(--text-3)">View on:</span><a href="https://www.zillow.com/homes/${encodeURIComponent(p.addr+', '+p.city)}_rb/" target="_blank" class="portal-btn">Zillow</a><a href="https://www.google.com/search?q=${encodeURIComponent('site:redfin.com '+p.addr+' '+pCityName+' '+pState)}" target="_blank" class="portal-btn">Redfin</a><a href="https://www.google.com/search?q=${encodeURIComponent('site:realtor.com '+p.addr+' '+pCityName+' '+pState)}" target="_blank" class="portal-btn">Realtor.com</a></div>`;
 
   document.getElementById('detail_panel').innerHTML=heroHtml+`<div class="detail-content">${scoreBanner}${portalLinks}${keyMetrics}${calcSection}${actions}</div>`;
 }
