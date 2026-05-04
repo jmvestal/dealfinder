@@ -426,7 +426,7 @@ function renderDetail(id){
   const actions=`<div class="action-bar"><button class="action-btn primary" onclick="toggleWatch(${id})" id="watch_btn">${wl?'★ Watchlisted':'☆ Add to watchlist'}</button><button class="action-btn" onclick="removeProp(${id})" ${p.id<100?'style="display:none"':''}>Remove</button></div>`;
   const zipM=p.city.match(/\d{5}/);const pZip=zipM?zipM[0]:'';
   const cityM=p.city.match(/^(.*?),\s*([A-Z]{2})/);
-  const pCityName=(cityM?cityM[1]:'').trim();const pState=cityM?cityM[2]:'';
+  const pCityName=(cityM?cityM[1]:'').trim();const pState=cityM?cityM[2]:'';const citySlug=pCityName.replace(/\s+/g,'-');
   const rtSlug=p.addr.replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-|-$/g,'')+'_'+citySlug+'_'+pState+'_'+pZip;
   const portalLinks=`<div class="portal-links"><span style="font-size:11px;color:var(--text-3)">View on:</span><a href="https://www.zillow.com/homes/${encodeURIComponent(p.addr+', '+p.city)}_rb/" target="_blank" class="portal-btn">Zillow</a><a href="https://www.redfin.com/search#query=${encodeURIComponent(p.addr+', '+p.city)}" target="_blank" class="portal-btn">Redfin</a><a href="https://www.realtor.com/realestateandhomes-detail/${rtSlug}/" target="_blank" class="portal-btn">Realtor.com</a></div>`;
 
